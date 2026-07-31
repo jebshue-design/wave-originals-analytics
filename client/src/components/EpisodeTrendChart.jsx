@@ -91,11 +91,11 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
         <h2 className="detail-section-title">Performance Over Time</h2>
         <div className="chart-legend">
           <span className="legend-item">
-            <span className="channel-swatch" style={{ background: 'var(--series-downloads)' }} />
+            <span className="channel-swatch" style={{ background: 'var(--fg-dim)' }} />
             Audio
           </span>
           <span className="legend-item">
-            <span className="channel-swatch" style={{ background: 'var(--series-views)' }} />
+            <span className="channel-swatch" style={{ background: 'var(--volt)' }} />
             YouTube
           </span>
           {baselineTotal !== null && (
@@ -154,10 +154,19 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           const isHovered = i === hoverIndex;
 
           return (
-            <g key={b.ep.episode_id} opacity={hoverIndex === null || isHovered ? 1 : 0.4}>
-              <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--series-downloads)" />
+            <g key={b.ep.episode_id}>
+              {isHovered && (
+                <rect
+                  x={PAD_LEFT + slotWidth * i}
+                  y={PAD_TOP}
+                  width={slotWidth}
+                  height={PLOT_H}
+                  fill="var(--bg-elev-2)"
+                />
+              )}
+              <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--fg-dim)" />
               {youtubeHeight > 0 && (
-                <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--series-views)" />
+                <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--volt)" />
               )}
               {status && (
                 <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
