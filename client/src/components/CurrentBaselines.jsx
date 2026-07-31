@@ -3,14 +3,13 @@ import { metricLabel, metricDescription } from '../config/metrics';
 import { formatCompactNumber, formatPercent, formatRawPercent } from '../utils/format';
 import { InfoTip } from './InfoTip';
 
-const KEYS = [
-  'total_performance_combined',
-  'youtube_views_total',
-  'audio_downloads_total',
-  'ctr_1hr',
-  'ctr_24hr',
-  'avg_watch_pct',
-];
+// total_performance_combined isn't fetched as its own median — it's derived
+// below as the sum of the youtube/audio baselines instead, so this tile
+// always agrees with the other two rather than being an independent median
+// that can land on a different "middle" episode than either component (see
+// DISPLAY_KEYS for the render order, which still shows it first).
+const FETCH_KEYS = ['youtube_views_total', 'audio_downloads_total', 'ctr_1hr', 'ctr_24hr', 'avg_watch_pct'];
+const DISPLAY_KEYS = ['total_performance_combined', ...FETCH_KEYS];
 
 const FORMATTERS = {
   ctr_1hr: formatRawPercent,
@@ -19,8 +18,14 @@ const FORMATTERS = {
 };
 
 export function CurrentBaselines({ episodes }) {
-  const { baselines, sampleSize } = computeCurrentBaselines(episodes, KEYS);
-  const hasAny = KEYS.some((key) => baselines[key] !== null);
+  const { baselines: fetched, sampleSize } = computeCurrentBaselines(episodes, FETCH_KEYS);
+  const { youtube_views_total, audio_downloads_total } = fetched;
+  const total =
+    youtube_views_total !== null && audio_downloads_total !== null
+      ? youtube_views_total + audio_downloads_total
+      : null;
+  const baselines = { ...fetched, total_performance_combined: total };
+  const hasAny = DISPLAY_KEYS.some((key) => baselines[key] !== null);
 
   return (
     <div className="correlation-panel">
@@ -32,7 +37,7 @@ export function CurrentBaselines({ episodes }) {
         <p className="empty-state spec">Not enough recent episodes yet to set a current baseline.</p>
       ) : (
         <div className="stat-tile-row">
-          {KEYS.map((key, index) => {
+          {DISPLAY_KEYS.map((key, index) => {
             const format = FORMATTERS[key] || formatCompactNumber;
             return (
               <div
