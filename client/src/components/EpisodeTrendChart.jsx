@@ -165,7 +165,15 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
         {bars.map((b, i) => {
           const status = trendStatus(b.total, trailingBaselines?.get(b.ep.episode_id)?.total_performance_combined);
           const title = b.ep.episode_title.length > 60 ? `${b.ep.episode_title.slice(0, 60)}…` : b.ep.episode_title;
-          const tooltip = `${formatDate(b.ep.published_at)} — "${title}". Total ${formatCompactNumber(b.total)} (Audio ${formatCompactNumber(b.audio)}, YouTube ${formatCompactNumber(b.youtube)})${status ? `, ${STATUS_LABEL[status]} vs. typical` : ''}.`;
+          const tooltip = [
+            `"${title}" — ${formatDate(b.ep.published_at)}`,
+            `• Total: ${formatCompactNumber(b.total)}`,
+            `• Audio: ${formatCompactNumber(b.audio)}`,
+            `• YouTube: ${formatCompactNumber(b.youtube)}`,
+            status ? `• ${STATUS_LABEL[status]} vs. typical` : null,
+          ]
+            .filter(Boolean)
+            .join('\n');
           return (
             <span
               key={b.ep.episode_id}

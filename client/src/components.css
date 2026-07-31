@@ -1359,10 +1359,10 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  font: 400 12px/1.4 var(--font-sans);
+  font: 400 12px/1.5 var(--font-sans);
   text-transform: none;
   letter-spacing: normal;
-  white-space: normal;
+  white-space: pre-line;
   text-align: left;
   opacity: 0;
   pointer-events: none;
