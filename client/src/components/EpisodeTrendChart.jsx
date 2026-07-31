@@ -3,11 +3,11 @@ import { formatCompactNumber, formatDate } from '../utils/format';
 import { trendStatus } from '../utils/stats';
 
 const WIDTH = 760;
-const HEIGHT = 140;
+const HEIGHT = 150;
 const PAD_LEFT = 44;
 const PAD_RIGHT = 8;
 const PAD_TOP = 14;
-const PAD_BOTTOM = 18;
+const PAD_BOTTOM = 26;
 const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 const PLOT_H = HEIGHT - PAD_TOP - PAD_BOTTOM;
 const MAX_EPISODES = 10;
@@ -25,6 +25,14 @@ const STATUS_COLOR_VAR = {
 };
 const STATUS_ICON = { good: '▲', average: '●', bad: '▼' };
 const STATUS_LABEL = { good: 'good', average: 'average', bad: 'needs attention' };
+
+// Short enough (e.g. "7/22") to sit under every bar without the x-axis
+// turning into a wall of text — the full date is still in the tooltip.
+function formatShortDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' }).format(d);
+}
 
 export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline }) {
   const [hoverIndex, setHoverIndex] = useState(null);
@@ -111,12 +119,11 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
 
           <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={HEIGHT - PAD_BOTTOM} y2={HEIGHT - PAD_BOTTOM} stroke="var(--line)" strokeWidth="1" />
 
-          <text x={PAD_LEFT} y={HEIGHT - 4} textAnchor="start" className="chart-tick">
-            {formatDate(recent[0].published_at)}
-          </text>
-          <text x={WIDTH - PAD_RIGHT} y={HEIGHT - 4} textAnchor="end" className="chart-tick">
-            {formatDate(recent[recent.length - 1].published_at)}
-          </text>
+          {bars.map((b, i) => (
+            <text key={b.ep.episode_id} x={slotCenter(i)} y={HEIGHT - 8} textAnchor="middle" className="chart-tick">
+              {formatShortDate(b.ep.published_at)}
+            </text>
+          ))}
 
           {baselineTotal !== null && (
             <line
