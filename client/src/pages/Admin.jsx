@@ -485,6 +485,77 @@ function AccountsPanel() {
   );
 }
 
+function MeetingDeckPanel() {
+  const [days, setDays] = useState(14);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Opens the tab synchronously (before the fetch starts) so the browser
+  // doesn't treat it as an unrequested popup — the loading message is written
+  // in immediately, then replaced with the real deck once it's generated.
+  async function handleGenerate(e) {
+    e.preventDefault();
+    setError(null);
+    const win = window.open('', '_blank');
+    if (!win) {
+      setError('Your browser blocked the new tab — allow pop-ups for this site and try again.');
+      return;
+    }
+    win.document.write(
+      '<!doctype html><html><body style="background:#0b0909;color:#f2efe9;font-family:-apple-system,sans-serif;padding:48px;">Generating your meeting deck — this can take up to a minute while each show gets an AI takeaway…</body></html>'
+    );
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/admin/meeting-deck?days=${days}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Could not generate the deck.');
+      const html = await res.text();
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } catch (err) {
+      win.close();
+      setError(err.message || 'Could not generate the deck.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="toolbar">
+        <p className="spec" style={{ margin: 0 }}>
+          Materials for your biweekly producer meeting
+        </p>
+      </div>
+
+      <div className="glass-panel meeting-deck-form">
+        <form onSubmit={handleGenerate}>
+          <label className="spec" htmlFor="deck-days">
+            Days back
+          </label>
+          <input
+            id="deck-days"
+            type="number"
+            min={1}
+            max={90}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value) || 14)}
+          />
+          <button type="submit" className="btn-primary" disabled={generating}>
+            {generating ? 'Generating…' : 'Generate deck'}
+          </button>
+        </form>
+        <p className="meeting-deck-hint">
+          Opens in a new tab — high-level performance per show, then every episode from the window with its stats,
+          AI insight, and producer notes. Print or save as PDF from there.
+        </p>
+      </div>
+
+      {error && <p className="form-error spec">{error}</p>}
+    </>
+  );
+}
+
 function ActivityDashboard({ onLogout }) {
   const [tab, setTab] = useState('activity');
 
@@ -508,6 +579,7 @@ function ActivityDashboard({ onLogout }) {
             options={[
               { value: 'activity', label: 'Activity' },
               { value: 'accounts', label: 'Accounts' },
+              { value: 'deck', label: 'Meeting deck' },
             ]}
             value={tab}
             onChange={setTab}
@@ -518,7 +590,9 @@ function ActivityDashboard({ onLogout }) {
         </div>
       </header>
 
-      {tab === 'activity' ? <ActivityPanel /> : <AccountsPanel />}
+      {tab === 'activity' && <ActivityPanel />}
+      {tab === 'accounts' && <AccountsPanel />}
+      {tab === 'deck' && <MeetingDeckPanel />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { encryptPassword, decryptPassword, generatePasswordFromName } from '../utils/password.js';
+import { generateMeetingDeckHtml } from '../ai/generateMeetingDeck.js';
 
 export const adminRouter = Router();
 
@@ -228,6 +229,19 @@ adminRouter.delete('/accounts/:id', requireAdmin, async (req, res, next) => {
   try {
     await pool.query('DELETE FROM user_accounts WHERE id = $1', [req.params.id]);
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Returns a standalone HTML document (not JSON) — meant to be opened
+// directly in a browser tab for a biweekly producer meeting, not consumed
+// by the SPA's own fetch/render cycle.
+adminRouter.get('/meeting-deck', requireAdmin, async (req, res, next) => {
+  try {
+    const days = Number(req.query.days) || 14;
+    const html = await generateMeetingDeckHtml(pool, { days });
+    res.set('Content-Type', 'text/html; charset=utf-8').send(html);
   } catch (err) {
     next(err);
   }

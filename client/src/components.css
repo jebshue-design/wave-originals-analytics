@@ -1041,6 +1041,44 @@
   outline-offset: -1px;
 }
 
+.meeting-deck-form {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meeting-deck-form form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meeting-deck-form input {
+  width: 70px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  padding: 9px 12px;
+  font: inherit;
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+
+.meeting-deck-form input:focus {
+  outline: 2px solid var(--volt);
+  outline-offset: -1px;
+}
+
+.meeting-deck-hint {
+  max-width: 60ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-dim);
+}
+
 .admin-password-cell {
   display: inline-flex;
   align-items: center;
