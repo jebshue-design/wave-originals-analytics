@@ -1041,47 +1041,19 @@
   outline-offset: -1px;
 }
 
-@keyframes password-reveal-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.password-reveal {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 16px 18px;
-  border-left: 3px solid var(--intent-success);
-  animation: password-reveal-in var(--dur-quick, 180ms) var(--ease-standard, ease-out);
-}
-
-.password-reveal-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.password-reveal-value {
-  display: flex;
+.admin-password-cell {
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  font: 600 15px/1.4 var(--font-mono);
-  letter-spacing: var(--tracking-mono);
-  color: var(--intent-success);
 }
 
-.password-reveal-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.admin-password-value {
+  font: 600 13px/1.4 var(--font-mono);
+  letter-spacing: var(--tracking-mono);
+  color: var(--intent-success);
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
 }
 
 .admin-accounts-table tbody tr {

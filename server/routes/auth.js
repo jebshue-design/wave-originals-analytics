@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
-import { verifyPassword } from '../utils/password.js';
+import { passwordMatches } from '../utils/password.js';
 
 export const authRouter = Router();
 
@@ -29,7 +29,7 @@ authRouter.post('/login', async (req, res, next) => {
     const { rows } = await pool.query('SELECT * FROM user_accounts WHERE lower(name) = lower($1)', [userName]);
     const account = rows[0];
     const ok = account
-      ? verifyPassword(password, account.password_hash)
+      ? passwordMatches(password, account.password_encrypted)
       : passwordsMatch(password, process.env.APP_PASSWORD || '');
     if (!ok) {
       return res.status(401).json({ error: 'Incorrect password' });

@@ -1,18 +1,44 @@
 import crypto from 'node:crypto';
 
-export function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+// Reversible (not one-way hashed) so the admin dashboard can show these
+// passwords back in plain text — a deliberate tradeoff for this small
+// internal tool: anyone with admin access and this key can recover any
+// account's password, in exchange for the admin being able to look them up.
+function getEncryptionKey() {
+  const keyHex = process.env.ACCOUNT_ENCRYPTION_KEY;
+  if (!keyHex) throw new Error('ACCOUNT_ENCRYPTION_KEY is not set');
+  return Buffer.from(keyHex, 'hex');
 }
 
-export function verifyPassword(password, stored) {
-  const [salt, hash] = (stored || '').split(':');
-  if (!salt || !hash) return false;
-  const hashBuffer = Buffer.from(hash, 'hex');
-  const candidateBuffer = crypto.scryptSync(password, salt, 64);
-  if (hashBuffer.length !== candidateBuffer.length) return false;
-  return crypto.timingSafeEqual(hashBuffer, candidateBuffer);
+export function encryptPassword(password) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(password, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+export function decryptPassword(stored) {
+  const [ivHex, tagHex, dataHex] = (stored || '').split(':');
+  if (!ivHex || !tagHex || !dataHex) return null;
+  const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  const decrypted = Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]);
+  return decrypted.toString('utf8');
+}
+
+export function passwordMatches(candidate, storedEncrypted) {
+  let actual;
+  try {
+    actual = decryptPassword(storedEncrypted);
+  } catch {
+    return false;
+  }
+  if (actual === null) return false;
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(actual);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 // A password built from the name rather than a fully opaque random string —

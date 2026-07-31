@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
-import { hashPassword, generatePasswordFromName } from '../utils/password.js';
+import { encryptPassword, decryptPassword, generatePasswordFromName } from '../utils/password.js';
 
 export const adminRouter = Router();
 
@@ -116,20 +116,29 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
   }
 });
 
+// Passwords are decrypted for display here — this is the whole point of the
+// switch to reversible encryption (see server/utils/password.js) — so the
+// admin dashboard can show every account's current password, not just at
+// creation time.
 adminRouter.get('/accounts', requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, created_at, last_login_at FROM user_accounts ORDER BY created_at DESC`
+      `SELECT id, name, password_encrypted, created_at, last_login_at FROM user_accounts ORDER BY created_at DESC`
     );
-    res.json(rows);
+    res.json(
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        password: decryptPassword(row.password_encrypted),
+        created_at: row.created_at,
+        last_login_at: row.last_login_at,
+      }))
+    );
   } catch (err) {
     next(err);
   }
 });
 
-// Password is generated (from the typed name) rather than admin-supplied —
-// returned once in this response so it can be handed to that person; it's
-// never stored or retrievable in plain text afterward.
 adminRouter.post('/accounts', requireAdmin, async (req, res, next) => {
   try {
     const { name } = req.body || {};
@@ -139,11 +148,11 @@ adminRouter.post('/accounts', requireAdmin, async (req, res, next) => {
     }
 
     const password = generatePasswordFromName(trimmed);
-    const passwordHash = hashPassword(password);
+    const passwordEncrypted = encryptPassword(password);
 
     const { rows } = await pool.query(
-      `INSERT INTO user_accounts (name, password_hash) VALUES ($1, $2) RETURNING id, name, created_at`,
-      [trimmed, passwordHash]
+      `INSERT INTO user_accounts (name, password_encrypted) VALUES ($1, $2) RETURNING id, name, created_at`,
+      [trimmed, passwordEncrypted]
     );
     res.status(201).json({ ...rows[0], password });
   } catch (err) {
@@ -163,8 +172,8 @@ adminRouter.post('/accounts/:id/reset-password', requireAdmin, async (req, res, 
     }
 
     const password = generatePasswordFromName(existing[0].name);
-    const passwordHash = hashPassword(password);
-    await pool.query('UPDATE user_accounts SET password_hash = $1 WHERE id = $2', [passwordHash, id]);
+    const passwordEncrypted = encryptPassword(password);
+    await pool.query('UPDATE user_accounts SET password_encrypted = $1 WHERE id = $2', [passwordEncrypted, id]);
     res.json({ id: Number(id), name: existing[0].name, password });
   } catch (err) {
     next(err);

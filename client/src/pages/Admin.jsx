@@ -173,13 +173,23 @@ function ActivityPanel() {
   );
 }
 
+function PasswordCell({ password, onCopy, copied }) {
+  return (
+    <div className="admin-password-cell">
+      <span className="admin-password-value">{password}</span>
+      <button type="button" className="icon-button" onClick={onCopy}>
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
 function AccountsPanel() {
   const [accounts, setAccounts] = useState(null);
   const [error, setError] = useState(null);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [reveal, setReveal] = useState(null); // { name, password } — shown once, right after create/reset
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   function refresh() {
     api
@@ -196,8 +206,7 @@ function AccountsPanel() {
     setCreating(true);
     setError(null);
     try {
-      const account = await api.createAccount(name.trim());
-      setReveal({ name: account.name, password: account.password });
+      await api.createAccount(name.trim());
       setName('');
       refresh();
     } catch (err) {
@@ -210,8 +219,7 @@ function AccountsPanel() {
   async function handleReset(account) {
     setError(null);
     try {
-      const result = await api.resetAccountPassword(account.id);
-      setReveal({ name: result.name, password: result.password });
+      await api.resetAccountPassword(account.id);
       refresh();
     } catch (err) {
       setError(err.message || 'Could not reset password.');
@@ -229,10 +237,10 @@ function AccountsPanel() {
     }
   }
 
-  function copyPassword() {
-    navigator.clipboard?.writeText(reveal.password).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+  function copyPassword(account) {
+    navigator.clipboard?.writeText(account.password).then(() => {
+      setCopiedId(account.id);
+      setTimeout(() => setCopiedId(null), 1500);
     });
   }
 
@@ -258,23 +266,6 @@ function AccountsPanel() {
         </form>
       </div>
 
-      {reveal && (
-        <div className="glass-panel password-reveal">
-          <div className="password-reveal-info">
-            <span className="spec">Password for {reveal.name} — shown once, copy it now</span>
-            <span className="password-reveal-value">{reveal.password}</span>
-          </div>
-          <div className="password-reveal-actions">
-            <button className="icon-button" onClick={copyPassword}>
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-            <button className="icon-button" onClick={() => setReveal(null)}>
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       {error && <p className="form-error spec">{error}</p>}
       {!error && !accounts && <p className="empty-state spec">Loading…</p>}
 
@@ -289,6 +280,7 @@ function AccountsPanel() {
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Password</th>
                     <th>Created</th>
                     <th>Last login</th>
                     <th></th>
@@ -298,6 +290,13 @@ function AccountsPanel() {
                   {accounts.map((account) => (
                     <tr key={account.id}>
                       <td>{account.name}</td>
+                      <td>
+                        <PasswordCell
+                          password={account.password}
+                          copied={copiedId === account.id}
+                          onCopy={() => copyPassword(account)}
+                        />
+                      </td>
                       <td className="mono-num">{formatDateTime(account.created_at)}</td>
                       <td className="mono-num">{formatDateTime(account.last_login_at)}</td>
                       <td>
