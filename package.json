@@ -1,0 +1,19 @@
+{
+  "name": "wave-originals-analytics",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build:client": "npm run build --workspace client",
+    "migrate": "node server/db/migrate.js",
+    "seed": "node server/db/seed-from-csv.js",
+    "sync": "node server/sync.js",
+    "youtube:backfill": "node server/backfillThumbnails.js",
+    "start": "node server/index.js"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ]
+}
