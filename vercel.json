@@ -9,5 +9,8 @@
     "api/index.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/daily-update", "schedule": "0 9 * * *" }
+  ]
 }
