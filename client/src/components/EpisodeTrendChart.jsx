@@ -126,15 +126,26 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           ))}
 
           {baselineTotal !== null && (
-            <line
-              x1={PAD_LEFT}
-              x2={WIDTH - PAD_RIGHT}
-              y1={yFor(baselineTotal)}
-              y2={yFor(baselineTotal)}
-              stroke="var(--fg-dim)"
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
+            <>
+              <line
+                x1={PAD_LEFT}
+                x2={WIDTH - PAD_RIGHT}
+                y1={yFor(baselineTotal)}
+                y2={yFor(baselineTotal)}
+                stroke="var(--fg-muted)"
+                strokeWidth="1.5"
+                strokeDasharray="5 3"
+              />
+              <text
+                x={PAD_LEFT - 6}
+                y={yFor(baselineTotal) - 4}
+                textAnchor="end"
+                className="chart-tick"
+                fill="var(--fg-muted)"
+              >
+                Baseline {formatCompactNumber(baselineTotal)}
+              </text>
+            </>
           )}
 
           {bars.map((b, i) => {
