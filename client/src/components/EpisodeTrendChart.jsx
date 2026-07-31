@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { formatCompactNumber, formatDate } from '../utils/format';
 import { trendStatus } from '../utils/stats';
 
@@ -36,6 +36,7 @@ function formatShortDate(value) {
 
 export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline, accentColor = 'var(--volt)' }) {
   const [hoverIndex, setHoverIndex] = useState(null);
+  const gid = useId();
 
   const recent = [...episodes]
     .filter(
@@ -110,6 +111,21 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           role="img"
           aria-label={`Total performance across the last ${bars.length} episodes, split into audio downloads and YouTube views`}
         >
+          <defs>
+            <linearGradient id={`${gid}-audio`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--fg-muted)" />
+              <stop offset="100%" stopColor="var(--fg-dim)" />
+            </linearGradient>
+            <linearGradient id={`${gid}-youtube`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accentColor} stopOpacity="1" />
+              <stop offset="100%" stopColor={accentColor} stopOpacity="0.78" />
+            </linearGradient>
+            <linearGradient id={`${gid}-sheen`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
           <text x={PAD_LEFT - 6} y={yFor(maxValue) + 3} textAnchor="end" className="chart-tick">
             {formatCompactNumber(maxValue)}
           </text>
@@ -163,9 +179,15 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
                 {i === hoverIndex && (
                   <rect x={PAD_LEFT + slotWidth * i} y={PAD_TOP} width={slotWidth} height={PLOT_H} fill="var(--bg-elev-2)" />
                 )}
-                <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--fg-dim)" />
+                <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} rx={2} fill={`url(#${gid}-audio)`} />
+                {audioHeight > 0 && (
+                  <rect x={x} y={audioTop} width={barWidth} height={Math.min(8, audioHeight)} rx={2} fill={`url(#${gid}-sheen)`} />
+                )}
                 {youtubeHeight > 0 && (
-                  <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill={accentColor} />
+                  <>
+                    <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} rx={2} fill={`url(#${gid}-youtube)`} />
+                    <rect x={x} y={youtubeTop} width={barWidth} height={Math.min(8, youtubeHeight)} rx={2} fill={`url(#${gid}-sheen)`} />
+                  </>
                 )}
                 {status && (
                   <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
