@@ -53,6 +53,8 @@ function showNameFromPath(path) {
   }
 }
 
+const DAILY_TREND_DAYS = 14;
+
 adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(`
@@ -62,7 +64,23 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
       LIMIT 5000
     `);
 
+    // Zero-filled so the trend chart shows real gaps (no activity that day)
+    // rather than the chart's x-axis silently skipping days with nothing.
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const dailyMap = new Map();
+    for (let i = DAILY_TREND_DAYS - 1; i >= 0; i -= 1) {
+      const key = new Date(now.getTime() - i * dayMs).toISOString().slice(0, 10);
+      dailyMap.set(key, 0);
+    }
+    const trendCutoff = new Date(now.getTime() - DAILY_TREND_DAYS * dayMs);
+
     const byUser = new Map();
+    const globalShowViews = new Map();
+    let totalLogins = 0;
+    let totalPageViews = 0;
+    let totalNotes = 0;
+
     for (const row of rows) {
       if (!byUser.has(row.user_name)) {
         byUser.set(row.user_name, {
@@ -81,11 +99,23 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
       if (row.event_type === 'login') {
         u.login_count += 1;
         u.first_login = row.created_at; // overwritten every hit; rows are newest-first so the last write left standing is the oldest login
+        totalLogins += 1;
       } else if (row.event_type === 'page_view') {
         u.page_view_count += 1;
-        if (showName) u.showViews.set(showName, (u.showViews.get(showName) || 0) + 1);
+        totalPageViews += 1;
+        if (showName) {
+          u.showViews.set(showName, (u.showViews.get(showName) || 0) + 1);
+          globalShowViews.set(showName, (globalShowViews.get(showName) || 0) + 1);
+        }
       } else if (row.event_type === 'note_added') {
         u.note_count += 1;
+        totalNotes += 1;
+      }
+
+      const createdAt = new Date(row.created_at);
+      if (createdAt >= trendCutoff) {
+        const dayKey = createdAt.toISOString().slice(0, 10);
+        if (dailyMap.has(dayKey)) dailyMap.set(dayKey, dailyMap.get(dayKey) + 1);
       }
     }
 
@@ -110,7 +140,21 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
       show_name: showNameFromPath(row.path),
     }));
 
-    res.json({ users, recent });
+    const summary = {
+      activeUsers: byUser.size,
+      totalLogins,
+      totalPageViews,
+      totalNotes,
+    };
+
+    const daily = Array.from(dailyMap.entries()).map(([date, count]) => ({ date, count }));
+
+    const topShows = Array.from(globalShowViews.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([show_name, views]) => ({ show_name, views }));
+
+    res.json({ summary, daily, topShows, users, recent });
   } catch (err) {
     next(err);
   }
