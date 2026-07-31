@@ -1,5 +1,12 @@
+import dns from 'node:dns';
 import pg from 'pg';
 import 'dotenv/config';
+
+// Some serverless platforms resolve a dual-stack host's IPv6 address first,
+// but can't actually route to it — the connection then hangs (instead of
+// failing fast) until something else times out. Preferring IPv4 avoids that
+// silent hang entirely.
+dns.setDefaultResultOrder('ipv4first');
 
 const { Pool } = pg;
 
