@@ -3,17 +3,16 @@ import { formatCompactNumber, formatDate } from '../utils/format';
 import { trendStatus } from '../utils/stats';
 
 const WIDTH = 760;
-const HEIGHT = 160;
-const PAD_LEFT = 48;
-const PAD_RIGHT = 16;
-const PAD_TOP = 16;
-const PAD_BOTTOM = 20;
+const HEIGHT = 140;
+const PAD_LEFT = 44;
+const PAD_RIGHT = 8;
+const PAD_TOP = 14;
+const PAD_BOTTOM = 18;
 const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 const PLOT_H = HEIGHT - PAD_TOP - PAD_BOTTOM;
 const MAX_EPISODES = 10;
-const Y_TICK_COUNT = 3;
-const BAR_WIDTH_RATIO = 0.56; // fraction of each episode's slot the bar itself occupies
-const SEGMENT_GAP = 2; // visual gap between the stacked audio/youtube segments
+const BAR_WIDTH_RATIO = 0.4; // fraction of each episode's slot the bar itself occupies
+const SEGMENT_GAP = 1; // hairline gap between the stacked audio/youtube segments
 
 // Same good/average/bad vocabulary and colors as TrendIndicator elsewhere,
 // shown as a small glyph above each bar rather than recoloring the bar
@@ -65,7 +64,7 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
       : null;
 
   const maxValue = Math.max(...bars.map((b) => b.total), baselineTotal || 0);
-  const yMax = maxValue * 1.2 || 1;
+  const yMax = maxValue * 1.15 || 1;
 
   function yFor(v) {
     return PAD_TOP + (1 - v / yMax) * PLOT_H;
@@ -75,8 +74,6 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
   function slotCenter(i) {
     return PAD_LEFT + slotWidth * (i + 0.5);
   }
-
-  const yTicks = Array.from({ length: Y_TICK_COUNT + 1 }, (_, i) => (yMax / Y_TICK_COUNT) * i);
 
   function handleMove(e) {
     const rect = svgRef.current.getBoundingClientRect();
@@ -117,30 +114,19 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverIndex(null)}
       >
-        <defs>
-          <linearGradient id="barFillDownloads" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--series-downloads)" stopOpacity="1" />
-            <stop offset="100%" stopColor="var(--series-downloads)" stopOpacity="0.72" />
-          </linearGradient>
-          <linearGradient id="barFillViews" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--series-views)" stopOpacity="1" />
-            <stop offset="100%" stopColor="var(--series-views)" stopOpacity="0.72" />
-          </linearGradient>
-        </defs>
+        <text x={PAD_LEFT - 6} y={yFor(maxValue) + 3} textAnchor="end" className="chart-tick">
+          {formatCompactNumber(maxValue)}
+        </text>
+        <text x={PAD_LEFT - 6} y={HEIGHT - PAD_BOTTOM} textAnchor="end" className="chart-tick">
+          0
+        </text>
 
-        {yTicks.map((t) => (
-          <g key={t}>
-            <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={yFor(t)} y2={yFor(t)} stroke="var(--line)" strokeWidth="1" />
-            <text x={PAD_LEFT - 8} y={yFor(t) + 3} textAnchor="end" className="chart-tick">
-              {formatCompactNumber(t)}
-            </text>
-          </g>
-        ))}
+        <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={HEIGHT - PAD_BOTTOM} y2={HEIGHT - PAD_BOTTOM} stroke="var(--line)" strokeWidth="1" />
 
-        <text x={PAD_LEFT} y={HEIGHT - 8} textAnchor="start" className="chart-tick">
+        <text x={PAD_LEFT} y={HEIGHT - 4} textAnchor="start" className="chart-tick">
           {formatDate(recent[0].published_at)}
         </text>
-        <text x={WIDTH - PAD_RIGHT} y={HEIGHT - 8} textAnchor="end" className="chart-tick">
+        <text x={WIDTH - PAD_RIGHT} y={HEIGHT - 4} textAnchor="end" className="chart-tick">
           {formatDate(recent[recent.length - 1].published_at)}
         </text>
 
@@ -151,8 +137,8 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
             y1={yFor(baselineTotal)}
             y2={yFor(baselineTotal)}
             stroke="var(--fg-dim)"
-            strokeWidth="2"
-            strokeDasharray="4 3"
+            strokeWidth="1"
+            strokeDasharray="3 3"
           />
         )}
 
@@ -168,29 +154,13 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           const isHovered = i === hoverIndex;
 
           return (
-            <g key={b.ep.episode_id} opacity={hoverIndex === null || isHovered ? 1 : 0.55}>
-              {isHovered && (
-                <rect
-                  x={PAD_LEFT + slotWidth * i}
-                  y={PAD_TOP}
-                  width={slotWidth}
-                  height={PLOT_H}
-                  fill="rgba(255, 255, 255, 0.04)"
-                />
-              )}
-              <rect
-                x={x}
-                y={audioTop}
-                width={barWidth}
-                height={Math.max(0, audioHeight)}
-                rx={3}
-                fill="url(#barFillDownloads)"
-              />
+            <g key={b.ep.episode_id} opacity={hoverIndex === null || isHovered ? 1 : 0.4}>
+              <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--series-downloads)" />
               {youtubeHeight > 0 && (
-                <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} rx={3} fill="url(#barFillViews)" />
+                <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--series-views)" />
               )}
               {status && (
-                <text x={cx} y={yFor(b.total) - 8} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="11">
+                <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
                   {STATUS_ICON[status]}
                 </text>
               )}
@@ -216,15 +186,15 @@ function EpisodeTooltip({ x, bar, status }) {
   ];
   if (status) lines.push(`${STATUS_ICON[status]} ${status} vs. typical`);
 
-  const boxWidth = 230;
-  const boxHeight = lines.length * 14 + 10;
+  const boxWidth = 220;
+  const boxHeight = lines.length * 13 + 10;
   const clampedX = Math.min(WIDTH - PAD_RIGHT - boxWidth, Math.max(PAD_LEFT, x - boxWidth / 2));
 
   return (
     <g>
       <rect x={clampedX} y={PAD_TOP} width={boxWidth} height={boxHeight} fill="var(--bg-elev-2)" stroke="var(--line-strong)" />
       {lines.map((line, i) => (
-        <text key={i} x={clampedX + 8} y={PAD_TOP + 14 + i * 14} className="chart-tooltip-text">
+        <text key={i} x={clampedX + 8} y={PAD_TOP + 13 + i * 13} className="chart-tooltip-text">
           {line}
         </text>
       ))}
