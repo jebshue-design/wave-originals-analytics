@@ -278,6 +278,18 @@ episodesRouter.post('/episodes/:id/notes', async (req, res, next) => {
       [id]
     );
 
+    // Logged against req.session.userName (the logged-in producer) rather
+    // than the free-text author_name on the note form itself, so the admin
+    // dashboard's per-user note counts reflect who's actually using the
+    // tool, not whatever name someone typed into that field.
+    const { rows: showRows } = await pool.query('SELECT show_name FROM episodes WHERE episode_id = $1', [id]);
+    const showName = showRows[0]?.show_name;
+    await pool.query('INSERT INTO activity_log (user_name, event_type, path) VALUES ($1, $2, $3)', [
+      req.session.userName || 'Unknown',
+      'note_added',
+      showName ? `/shows/${encodeURIComponent(showName)}` : null,
+    ]);
+
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23503') {

@@ -105,10 +105,17 @@ CREATE TABLE IF NOT EXISTS show_thumbnail_patterns (
 CREATE TABLE IF NOT EXISTS activity_log (
   id SERIAL PRIMARY KEY,
   user_name TEXT NOT NULL,
-  event_type TEXT NOT NULL CHECK (event_type IN ('login', 'page_view')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('login', 'page_view', 'note_added')),
   path TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_log_user_name ON activity_log (user_name);
+
+-- Widen the event_type check for pre-existing databases (CREATE TABLE IF NOT
+-- EXISTS above only applies to a fresh install) — note_added logs when a
+-- producer leaves a thumbnail/hook note, keyed by the same '/shows/<show>'
+-- path convention page views use, so both aggregate off one `path` column.
+ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_event_type_check;
+ALTER TABLE activity_log ADD CONSTRAINT activity_log_event_type_check CHECK (event_type IN ('login', 'page_view', 'note_added'));

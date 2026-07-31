@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { WaveMark } from '../components/WaveMark';
 
+const EVENT_LABEL = { login: 'Login', page_view: 'Page view', note_added: 'Note left' };
+
 function formatDateTime(value) {
   if (!value) return '—';
   const d = new Date(value);
@@ -12,6 +14,19 @@ function formatDateTime(value) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(d);
+}
+
+function TopShows({ shows }) {
+  if (!shows || shows.length === 0) return <span className="spec">—</span>;
+  return (
+    <div className="admin-top-shows">
+      {shows.map((s) => (
+        <span key={s.show_name} className="admin-show-chip">
+          {s.show_name} <span className="mono-num">{s.views}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function AdminLogin({ onSuccess }) {
@@ -100,7 +115,7 @@ function ActivityDashboard({ onLogout }) {
       {activity && (
         <>
           <section className="show-section">
-            <h2 className="detail-section-title">Users</h2>
+            <h2 className="detail-section-title">Leaderboard</h2>
             {activity.users.length === 0 ? (
               <p className="empty-state spec">No logins recorded yet.</p>
             ) : (
@@ -108,21 +123,27 @@ function ActivityDashboard({ onLogout }) {
                 <table className="episode-table">
                   <thead>
                     <tr>
+                      <th>#</th>
                       <th>Name</th>
-                      <th>Last active</th>
-                      <th>First login</th>
-                      <th>Logins</th>
+                      <th>Shows viewed</th>
+                      <th>Notes left</th>
                       <th>Page views</th>
+                      <th>Logins</th>
+                      <th>Last active</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {activity.users.map((u) => (
+                    {activity.users.map((u, i) => (
                       <tr key={u.user_name}>
+                        <td className="mono-num">{i + 1}</td>
                         <td>{u.user_name}</td>
-                        <td className="mono-num">{formatDateTime(u.last_active)}</td>
-                        <td className="mono-num">{formatDateTime(u.first_login)}</td>
-                        <td className="mono-num">{u.login_count}</td>
+                        <td className="admin-shows-cell">
+                          <TopShows shows={u.top_shows} />
+                        </td>
+                        <td className="mono-num">{u.note_count}</td>
                         <td className="mono-num">{u.page_view_count}</td>
+                        <td className="mono-num">{u.login_count}</td>
+                        <td className="mono-num">{formatDateTime(u.last_active)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -142,7 +163,7 @@ function ActivityDashboard({ onLogout }) {
                     <tr>
                       <th>Name</th>
                       <th>Event</th>
-                      <th>Path</th>
+                      <th>Show</th>
                       <th>Time</th>
                     </tr>
                   </thead>
@@ -150,8 +171,8 @@ function ActivityDashboard({ onLogout }) {
                     {activity.recent.map((row, i) => (
                       <tr key={i}>
                         <td>{row.user_name}</td>
-                        <td>{row.event_type === 'login' ? 'Login' : 'Page view'}</td>
-                        <td>{row.path || '—'}</td>
+                        <td>{EVENT_LABEL[row.event_type] || row.event_type}</td>
+                        <td>{row.show_name || '—'}</td>
                         <td className="mono-num">{formatDateTime(row.created_at)}</td>
                       </tr>
                     ))}

@@ -982,6 +982,29 @@
   white-space: nowrap;
 }
 
+/* ---------- Admin activity dashboard ---------- */
+.admin-shows-cell {
+  white-space: normal;
+  max-width: 320px;
+}
+
+.admin-top-shows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-show-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* ---------- Empty / error states ---------- */
 .empty-state,
 .form-error {
