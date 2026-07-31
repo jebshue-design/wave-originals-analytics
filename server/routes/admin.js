@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
 import { encryptPassword, decryptPassword, generatePasswordFromName } from '../utils/password.js';
-import { generateMeetingDeckHtml } from '../ai/generateMeetingDeck.js';
+import { generateMeetingDeckHtml, STAT_KEYS, DEFAULT_STAT_KEYS } from '../ai/generateMeetingDeck.js';
 
 export const adminRouter = Router();
 
@@ -236,11 +236,26 @@ adminRouter.delete('/accounts/:id', requireAdmin, async (req, res, next) => {
 
 // Returns a standalone HTML document (not JSON) — meant to be opened
 // directly in a browser tab for a biweekly producer meeting, not consumed
-// by the SPA's own fetch/render cycle.
+// by the SPA's own fetch/render cycle. Accepts an explicit start/end date
+// range (falls back to the last 14 days) and a comma-separated `stats` list
+// (falls back to DEFAULT_STAT_KEYS) — both validated here rather than
+// trusted as-is from the query string.
 adminRouter.get('/meeting-deck', requireAdmin, async (req, res, next) => {
   try {
-    const days = Number(req.query.days) || 14;
-    const html = await generateMeetingDeckHtml(pool, { days });
+    const now = new Date();
+    const parsedStart = req.query.start ? new Date(`${req.query.start}T00:00:00`) : null;
+    const parsedEnd = req.query.end ? new Date(`${req.query.end}T23:59:59.999`) : null;
+    const start = parsedStart && !Number.isNaN(parsedStart.getTime()) ? parsedStart : new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const end = parsedEnd && !Number.isNaN(parsedEnd.getTime()) ? parsedEnd : now;
+
+    const requestedStats = typeof req.query.stats === 'string' ? req.query.stats.split(',').map((s) => s.trim()) : [];
+    const statKeys = requestedStats.filter((key) => STAT_KEYS.includes(key));
+
+    const html = await generateMeetingDeckHtml(pool, {
+      start,
+      end,
+      statKeys: statKeys.length > 0 ? statKeys : DEFAULT_STAT_KEYS,
+    });
     res.set('Content-Type', 'text/html; charset=utf-8').send(html);
   } catch (err) {
     next(err);

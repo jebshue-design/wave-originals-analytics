@@ -3,8 +3,29 @@ import { computeCurrentBaselines, trendStatus } from '../utils/stats.js';
 import { EXCLUDED_SHOWS } from '../config/excludedShows.js';
 import { accentForShow } from '../config/showArtColor.js';
 
-const AGGREGATE_KEYS = ['total_performance_combined', 'audio_downloads_total', 'youtube_views_total', 'ctr_1hr', 'ctr_24hr', 'avg_watch_pct'];
 const TAKEAWAY_CONCURRENCY = 3;
+
+// The full set of stats the deck can show, in default display order. `kind`
+// picks the formatter; `key` must match a column/alias selected in the
+// episodes query below. Exported so the admin route can validate the
+// `stats` query param against real keys instead of trusting arbitrary input.
+export const STAT_CATALOG = [
+  { key: 'total_performance_combined', label: 'Total performance', kind: 'compact' },
+  { key: 'audio_downloads_total', label: 'Audio downloads', kind: 'compact' },
+  { key: 'youtube_views_total', label: 'YouTube views', kind: 'compact' },
+  { key: 'ctr_1hr', label: '1hr CTR', kind: 'rawPct' },
+  { key: 'ctr_24hr', label: '24hr CTR', kind: 'rawPct' },
+  { key: 'avg_watch_pct', label: 'Watch-through', kind: 'pct' },
+  { key: 'first_dropoff_pct', label: 'Early drop-off', kind: 'pct' },
+];
+export const STAT_KEYS = STAT_CATALOG.map((s) => s.key);
+export const DEFAULT_STAT_KEYS = [
+  'total_performance_combined',
+  'audio_downloads_total',
+  'youtube_views_total',
+  'ctr_24hr',
+  'avg_watch_pct',
+];
 
 function escapeHtml(value) {
   if (value === null || value === undefined) return '';
@@ -37,6 +58,12 @@ function formatPct(value) {
   return `${(n * 100).toFixed(1)}%`;
 }
 
+const FORMATTERS = { compact: formatCompact, rawPct: formatRawPct, pct: formatPct };
+
+function formatStat(kind, value) {
+  return (FORMATTERS[kind] || formatCompact)(value);
+}
+
 function formatDate(value) {
   if (!value) return '—';
   const d = new Date(value);
@@ -61,12 +88,17 @@ function noteSummary(note) {
   return `${parts.join('; ')}${outcome}`;
 }
 
+// The AI takeaway always reasons over total performance + 24hr CTR
+// regardless of which stats the admin chose to *display* — the narrative is
+// about substance, not the table's current column selection.
 async function generateShowTakeaway(client, showName, windowLabel, aggregate, episodeSummaries) {
+  const total = aggregate.total_performance_combined;
+  const ctr = aggregate.ctr_24hr;
   const lines = [
     `Show: ${showName}`,
     `Period: ${windowLabel}`,
-    `Average total performance this period: ${formatCompact(aggregate.avgTotal)} (typical: ${formatCompact(aggregate.baseline.total_performance_combined)}) — ${STATUS_LABEL[aggregate.totalStatus] || 'not enough history yet'}`,
-    `Average 24hr CTR: ${formatRawPct(aggregate.avgCtr24hr)} (typical: ${formatRawPct(aggregate.baseline.ctr_24hr)}) — ${STATUS_LABEL[aggregate.ctrStatus] || 'not enough history yet'}`,
+    `Average total performance this period: ${formatCompact(total.avg)} (typical: ${formatCompact(total.baseline)}) — ${STATUS_LABEL[total.status] || 'not enough history yet'}`,
+    `Average 24hr CTR: ${formatRawPct(ctr.avg)} (typical: ${formatRawPct(ctr.baseline)}) — ${STATUS_LABEL[ctr.status] || 'not enough history yet'}`,
     '',
     'Episodes this period:',
     ...episodeSummaries,
@@ -99,10 +131,19 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-function renderEpisodeCard(ep, notes) {
-  const totalStatus = trendStatus(ep.total_performance_combined, ep.baseline.total_performance_combined);
-  const ctrStatus = trendStatus(ep.ctr_24hr, ep.baseline.ctr_24hr);
-  const watchStatus = trendStatus(ep.avg_watch_pct, ep.baseline.avg_watch_pct);
+function renderEpisodeCard(ep, notes, statKeys) {
+  const chips = statKeys
+    .map((key) => {
+      const stat = STAT_CATALOG.find((s) => s.key === key);
+      if (!stat) return '';
+      const status = trendStatus(ep[key], ep.baseline[key]);
+      return `
+        <div class="stat-chip">
+          <span class="stat-label">${escapeHtml(stat.label)}</span>
+          <span class="stat-value ${STATUS_CLASS[status] || ''}">${formatStat(stat.kind, ep[key])}</span>
+        </div>`;
+    })
+    .join('');
 
   return `
     <article class="episode-card">
@@ -110,28 +151,7 @@ function renderEpisodeCard(ep, notes) {
         <h3>${escapeHtml(ep.episode_title)}</h3>
         <span class="episode-date">${formatDate(ep.published_at)}</span>
       </div>
-      <div class="episode-stats">
-        <div class="stat-chip">
-          <span class="stat-label">Total performance</span>
-          <span class="stat-value ${STATUS_CLASS[totalStatus] || ''}">${formatCompact(ep.total_performance_combined)}</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-label">Audio</span>
-          <span class="stat-value">${formatCompact(ep.audio_downloads_total)}</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-label">YouTube</span>
-          <span class="stat-value">${formatCompact(ep.youtube_views_total)}</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-label">24hr CTR</span>
-          <span class="stat-value ${STATUS_CLASS[ctrStatus] || ''}">${formatRawPct(ep.ctr_24hr)}</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-label">Watch-through</span>
-          <span class="stat-value ${STATUS_CLASS[watchStatus] || ''}">${formatPct(ep.avg_watch_pct)}</span>
-        </div>
-      </div>
+      <div class="episode-stats">${chips}</div>
       ${
         ep.ai_insight
           ? `<div class="episode-insight">${escapeHtml(ep.ai_insight).replace(/\n\n/g, '</p><p>').replace(/\n- /g, '</p><p>• ')}</div>`
@@ -150,34 +170,32 @@ function renderEpisodeCard(ep, notes) {
     </article>`;
 }
 
-function renderShowSection(show, index) {
+function renderShowSection(show, index, statKeys) {
   const accent = accentForShow(show.showName, index);
+  const tiles = statKeys
+    .map((key) => {
+      const stat = STAT_CATALOG.find((s) => s.key === key);
+      if (!stat) return '';
+      const agg = show.aggregate[key];
+      return `
+        <div class="stat-tile">
+          <span class="spec">Avg. ${escapeHtml(stat.label.toLowerCase())}</span>
+          <span class="stat-tile-value ${STATUS_CLASS[agg.status] || ''}">${formatStat(stat.kind, agg.avg)}</span>
+          <span class="stat-tile-sub">typical: ${formatStat(stat.kind, agg.baseline)}</span>
+        </div>`;
+    })
+    .join('');
+
   return `
     <section class="show-block" style="--accent: ${accent}">
       <div class="show-block-head">
         <h2 id="${show.anchorId}">${escapeHtml(show.showName)}</h2>
         <span class="spec">${show.episodes.length} episode${show.episodes.length === 1 ? '' : 's'} this period</span>
       </div>
-      <div class="stat-tile-row">
-        <div class="stat-tile">
-          <span class="spec">Avg. total performance</span>
-          <span class="stat-tile-value ${STATUS_CLASS[show.aggregate.totalStatus] || ''}">${formatCompact(show.aggregate.avgTotal)}</span>
-          <span class="stat-tile-sub">typical: ${formatCompact(show.aggregate.baseline.total_performance_combined)}</span>
-        </div>
-        <div class="stat-tile">
-          <span class="spec">Avg. 24hr CTR</span>
-          <span class="stat-tile-value ${STATUS_CLASS[show.aggregate.ctrStatus] || ''}">${formatRawPct(show.aggregate.avgCtr24hr)}</span>
-          <span class="stat-tile-sub">typical: ${formatRawPct(show.aggregate.baseline.ctr_24hr)}</span>
-        </div>
-        <div class="stat-tile">
-          <span class="spec">Avg. watch-through</span>
-          <span class="stat-tile-value ${STATUS_CLASS[show.aggregate.watchStatus] || ''}">${formatPct(show.aggregate.avgWatch)}</span>
-          <span class="stat-tile-sub">typical: ${formatPct(show.aggregate.baseline.avg_watch_pct)}</span>
-        </div>
-      </div>
+      <div class="stat-tile-row">${tiles}</div>
       ${show.takeaway ? `<p class="show-takeaway">${escapeHtml(show.takeaway)}</p>` : ''}
       <div class="episode-list">
-        ${show.episodes.map((ep) => renderEpisodeCard(ep, show.notesByEpisode.get(ep.episode_id))).join('')}
+        ${show.episodes.map((ep) => renderEpisodeCard(ep, show.notesByEpisode.get(ep.episode_id), statKeys)).join('')}
       </div>
     </section>`;
 }
@@ -282,14 +300,20 @@ const PAGE_STYLE = `
 // regenerated — reuses whatever was written at sync time), and any producer
 // notes. Rendered server-side and returned as text/html directly (not JSON)
 // so hitting the route opens/prints like a real document.
-export async function generateMeetingDeckHtml(pool, { days = 14 } = {}) {
-  const windowStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const windowLabel = `${formatDate(windowStart)} – ${formatDate(new Date())}`;
+//
+// `start`/`end` are Date objects (inclusive); `statKeys` is the ordered list
+// of STAT_CATALOG keys to display at both the show and episode level — the
+// caller (the admin route) is responsible for defaulting/validating these.
+export async function generateMeetingDeckHtml(pool, { start, end, statKeys = DEFAULT_STAT_KEYS } = {}) {
+  const windowStart = start;
+  const windowEnd = end;
+  const windowLabel = `${formatDate(windowStart)} – ${formatDate(windowEnd)}`;
+  const selectedStats = statKeys.filter((key) => STAT_KEYS.includes(key));
 
   const { rows: episodes } = await pool.query(
     `SELECT e.episode_id, e.show_name, e.episode_title, e.published_at, e.ai_insight,
             e.total_performance_combined, e.audio_downloads_total, e.youtube_views_total,
-            e.ctr_1hr, e.ctr_24hr,
+            e.ctr_1hr, e.ctr_24hr, e.first_dropoff_pct,
             (SELECT AVG(c.retention) FROM episode_retention_curve c WHERE c.episode_id = e.episode_id) AS avg_watch_pct
      FROM episodes e
      WHERE e.show_name != ALL($1)
@@ -318,26 +342,23 @@ export async function generateMeetingDeckHtml(pool, { days = 14 } = {}) {
 
   const shows = [];
   for (const [showName, showEpisodes] of byShow) {
-    const windowEpisodes = showEpisodes.filter((ep) => ep.published_at && new Date(ep.published_at) >= windowStart);
+    const windowEpisodes = showEpisodes.filter((ep) => {
+      if (!ep.published_at) return false;
+      const published = new Date(ep.published_at);
+      return published >= windowStart && published <= windowEnd;
+    });
     if (windowEpisodes.length === 0) continue;
 
-    const baseline = computeCurrentBaselines(showEpisodes, AGGREGATE_KEYS) || {};
-
+    const baseline = computeCurrentBaselines(showEpisodes, STAT_KEYS) || {};
     const withBaseline = windowEpisodes.map((ep) => ({ ...ep, baseline }));
 
-    const avgTotal = average(windowEpisodes.map((ep) => ep.total_performance_combined));
-    const avgCtr24hr = average(windowEpisodes.map((ep) => ep.ctr_24hr));
-    const avgWatch = average(windowEpisodes.map((ep) => ep.avg_watch_pct));
-
-    const aggregate = {
-      avgTotal,
-      avgCtr24hr,
-      avgWatch,
-      baseline,
-      totalStatus: trendStatus(avgTotal, baseline.total_performance_combined),
-      ctrStatus: trendStatus(avgCtr24hr, baseline.ctr_24hr),
-      watchStatus: trendStatus(avgWatch, baseline.avg_watch_pct),
-    };
+    // Computed for every catalog stat (not just the selected ones) — cheap,
+    // and means toggling which stats are visible never needs a re-fetch.
+    const aggregate = {};
+    for (const key of STAT_KEYS) {
+      const avg = average(windowEpisodes.map((ep) => ep[key]));
+      aggregate[key] = { avg, baseline: baseline[key], status: trendStatus(avg, baseline[key]) };
+    }
 
     shows.push({
       showName,
@@ -389,7 +410,7 @@ export async function generateMeetingDeckHtml(pool, { days = 14 } = {}) {
   <nav class="deck-toc">
     ${shows.map((s) => `<a href="#${s.anchorId}">${escapeHtml(s.showName)}</a>`).join('')}
   </nav>
-  ${shows.map((show, i) => renderShowSection(show, i)).join('')}
+  ${shows.map((show, i) => renderShowSection(show, i, selectedStats)).join('')}
 </body>
 </html>`;
 }

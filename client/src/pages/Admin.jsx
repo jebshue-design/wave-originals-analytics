@@ -485,10 +485,34 @@ function AccountsPanel() {
   );
 }
 
+// Mirrors server/ai/generateMeetingDeck.js's STAT_CATALOG/DEFAULT_STAT_KEYS —
+// kept in sync manually (same dual-copy pattern as stats.js/showArtColor.js)
+// since this list is just labels for the picker, not the formatting logic.
+const STAT_OPTIONS = [
+  { key: 'total_performance_combined', label: 'Total performance' },
+  { key: 'audio_downloads_total', label: 'Audio downloads' },
+  { key: 'youtube_views_total', label: 'YouTube views' },
+  { key: 'ctr_1hr', label: '1hr CTR' },
+  { key: 'ctr_24hr', label: '24hr CTR' },
+  { key: 'avg_watch_pct', label: 'Watch-through' },
+  { key: 'first_dropoff_pct', label: 'Early drop-off' },
+];
+const DEFAULT_DECK_STATS = ['total_performance_combined', 'audio_downloads_total', 'youtube_views_total', 'ctr_24hr', 'avg_watch_pct'];
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function MeetingDeckPanel() {
-  const [days, setDays] = useState(14);
+  const [startDate, setStartDate] = useState(() => isoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)));
+  const [endDate, setEndDate] = useState(() => isoDate(new Date()));
+  const [selectedStats, setSelectedStats] = useState(DEFAULT_DECK_STATS);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+
+  function toggleStat(key) {
+    setSelectedStats((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
 
   // Opens the tab synchronously (before the fetch starts) so the browser
   // doesn't treat it as an unrequested popup — the loading message is written
@@ -496,6 +520,10 @@ function MeetingDeckPanel() {
   async function handleGenerate(e) {
     e.preventDefault();
     setError(null);
+    if (selectedStats.length === 0) {
+      setError('Pick at least one stat to show.');
+      return;
+    }
     const win = window.open('', '_blank');
     if (!win) {
       setError('Your browser blocked the new tab — allow pop-ups for this site and try again.');
@@ -506,7 +534,8 @@ function MeetingDeckPanel() {
     );
     setGenerating(true);
     try {
-      const res = await fetch(`/api/admin/meeting-deck?days=${days}`, { credentials: 'include' });
+      const params = new URLSearchParams({ start: startDate, end: endDate, stats: selectedStats.join(',') });
+      const res = await fetch(`/api/admin/meeting-deck?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Could not generate the deck.');
       const html = await res.text();
       win.document.open();
@@ -530,24 +559,40 @@ function MeetingDeckPanel() {
 
       <div className="glass-panel meeting-deck-form">
         <form onSubmit={handleGenerate}>
-          <label className="spec" htmlFor="deck-days">
-            Days back
-          </label>
-          <input
-            id="deck-days"
-            type="number"
-            min={1}
-            max={90}
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value) || 14)}
-          />
+          <div className="meeting-deck-row">
+            <label className="spec" htmlFor="deck-start">
+              Start
+            </label>
+            <input id="deck-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <label className="spec" htmlFor="deck-end">
+              End
+            </label>
+            <input id="deck-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+
+          <div className="meeting-deck-row meeting-deck-stats-row">
+            <span className="spec">Stats to show</span>
+            <div className="meeting-deck-stat-toggles">
+              {STAT_OPTIONS.map((stat) => (
+                <button
+                  type="button"
+                  key={stat.key}
+                  className={`meeting-deck-stat-toggle${selectedStats.includes(stat.key) ? ' is-selected' : ''}`}
+                  onClick={() => toggleStat(stat.key)}
+                >
+                  {stat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button type="submit" className="btn-primary" disabled={generating}>
             {generating ? 'Generating…' : 'Generate deck'}
           </button>
         </form>
         <p className="meeting-deck-hint">
-          Opens in a new tab — high-level performance per show, then every episode from the window with its stats,
-          AI insight, and producer notes. Print or save as PDF from there.
+          Opens in a new tab — high-level performance per show, then every episode in range with its stats, AI
+          insight, and producer notes. Print or save as PDF from there.
         </p>
       </div>
 
