@@ -34,7 +34,7 @@ function formatShortDate(value) {
   return new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' }).format(d);
 }
 
-export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline }) {
+export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline, accentColor = 'var(--volt)' }) {
   const [hoverIndex, setHoverIndex] = useState(null);
 
   const recent = [...episodes]
@@ -93,7 +93,7 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
             Audio
           </span>
           <span className="legend-item">
-            <span className="channel-swatch" style={{ background: 'var(--volt)' }} />
+            <span className="channel-swatch" style={{ background: accentColor }} />
             YouTube
           </span>
           {baselineTotal !== null && (
@@ -165,7 +165,7 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
                 )}
                 <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--fg-dim)" />
                 {youtubeHeight > 0 && (
-                  <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--volt)" />
+                  <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill={accentColor} />
                 )}
                 {status && (
                   <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
