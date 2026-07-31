@@ -119,3 +119,16 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_user_name ON activity_log (user_name
 -- path convention page views use, so both aggregate off one `path` column.
 ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_event_type_check;
 ALTER TABLE activity_log ADD CONSTRAINT activity_log_event_type_check CHECK (event_type IN ('login', 'page_view', 'note_added'));
+
+-- Named accounts an admin creates for individual producers, each with their
+-- own password (hashed as "salt:hash" — see server/utils/password.js). These
+-- sit alongside the shared APP_PASSWORD, not instead of it: at login, a name
+-- matching a row here is checked against its own password_hash; any other
+-- name falls back to the shared password, same as before.
+CREATE TABLE IF NOT EXISTS user_accounts (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ
+);

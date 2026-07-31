@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { WaveMark } from '../components/WaveMark';
+import { SegmentedToggle } from '../components/SegmentedToggle';
 
 const EVENT_LABEL = { login: 'Login', page_view: 'Page view', note_added: 'Note left' };
 
@@ -70,7 +71,7 @@ function AdminLogin({ onSuccess }) {
   );
 }
 
-function ActivityDashboard({ onLogout }) {
+function ActivityPanel() {
   const [activity, setActivity] = useState(null);
   const [error, setError] = useState(null);
 
@@ -83,33 +84,18 @@ function ActivityDashboard({ onLogout }) {
 
   useEffect(refresh, []);
 
-  async function handleLogout() {
-    await api.adminLogout();
-    onLogout();
-  }
-
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="app-brand">
-          <WaveMark />
-          <div className="app-title-block">
-            <span className="app-title">Activity</span>
-            <span className="app-subtitle">Wave Originals Admin</span>
-          </div>
-        </div>
-        <div className="app-header-actions">
-          <button className="icon-button" onClick={refresh}>
-            Refresh
-          </button>
-          <button className="icon-button" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+    <>
+      <div className="toolbar">
+        <p className="spec" style={{ margin: 0 }}>
+          Who&rsquo;s using the tool
+        </p>
+        <button className="icon-button" onClick={refresh}>
+          Refresh
+        </button>
+      </div>
 
       {error && <p className="form-error spec">{error}</p>}
-
       {!error && !activity && <p className="empty-state spec">Loading…</p>}
 
       {activity && (
@@ -183,6 +169,193 @@ function ActivityDashboard({ onLogout }) {
           </section>
         </>
       )}
+    </>
+  );
+}
+
+function AccountsPanel() {
+  const [accounts, setAccounts] = useState(null);
+  const [error, setError] = useState(null);
+  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [reveal, setReveal] = useState(null); // { name, password } — shown once, right after create/reset
+  const [copied, setCopied] = useState(false);
+
+  function refresh() {
+    api
+      .getAccounts()
+      .then(setAccounts)
+      .catch(() => setError('Could not load accounts.'));
+  }
+
+  useEffect(refresh, []);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const account = await api.createAccount(name.trim());
+      setReveal({ name: account.name, password: account.password });
+      setName('');
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Could not create account.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleReset(account) {
+    setError(null);
+    try {
+      const result = await api.resetAccountPassword(account.id);
+      setReveal({ name: result.name, password: result.password });
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Could not reset password.');
+    }
+  }
+
+  async function handleRemove(account) {
+    if (!window.confirm(`Remove ${account.name}'s account? They'll fall back to the shared password.`)) return;
+    setError(null);
+    try {
+      await api.deleteAccount(account.id);
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Could not remove account.');
+    }
+  }
+
+  function copyPassword() {
+    navigator.clipboard?.writeText(reveal.password).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <>
+      <div className="toolbar">
+        <p className="spec" style={{ margin: 0 }}>
+          Create a login for someone new
+        </p>
+      </div>
+
+      <div className="glass-panel account-create-form">
+        <form onSubmit={handleCreate} style={{ display: 'flex', gap: 10, flex: 1, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Their name"
+          />
+          <button type="submit" className="btn-primary" disabled={creating || !name.trim()}>
+            {creating ? 'Creating…' : 'Create account'}
+          </button>
+        </form>
+      </div>
+
+      {reveal && (
+        <div className="glass-panel password-reveal">
+          <div className="password-reveal-info">
+            <span className="spec">Password for {reveal.name} — shown once, copy it now</span>
+            <span className="password-reveal-value">{reveal.password}</span>
+          </div>
+          <div className="password-reveal-actions">
+            <button className="icon-button" onClick={copyPassword}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+            <button className="icon-button" onClick={() => setReveal(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="form-error spec">{error}</p>}
+      {!error && !accounts && <p className="empty-state spec">Loading…</p>}
+
+      {accounts && (
+        <section className="show-section">
+          <h2 className="detail-section-title">Accounts</h2>
+          {accounts.length === 0 ? (
+            <p className="empty-state spec">No named accounts yet — everyone's using the shared password.</p>
+          ) : (
+            <div className="episode-table-wrap">
+              <table className="episode-table admin-accounts-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th>Last login</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((account) => (
+                    <tr key={account.id}>
+                      <td>{account.name}</td>
+                      <td className="mono-num">{formatDateTime(account.created_at)}</td>
+                      <td className="mono-num">{formatDateTime(account.last_login_at)}</td>
+                      <td>
+                        <div className="admin-account-actions">
+                          <button className="icon-button" onClick={() => handleReset(account)}>
+                            Reset password
+                          </button>
+                          <button className="icon-button" onClick={() => handleRemove(account)}>
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+    </>
+  );
+}
+
+function ActivityDashboard({ onLogout }) {
+  const [tab, setTab] = useState('activity');
+
+  async function handleLogout() {
+    await api.adminLogout();
+    onLogout();
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-brand">
+          <WaveMark />
+          <div className="app-title-block">
+            <span className="app-title">Admin</span>
+            <span className="app-subtitle">Wave Originals</span>
+          </div>
+        </div>
+        <div className="app-header-actions">
+          <SegmentedToggle
+            options={[
+              { value: 'activity', label: 'Activity' },
+              { value: 'accounts', label: 'Accounts' },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+          <button className="icon-button" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
+      </header>
+
+      {tab === 'activity' ? <ActivityPanel /> : <AccountsPanel />}
     </div>
   );
 }

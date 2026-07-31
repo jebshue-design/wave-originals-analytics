@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
+import { hashPassword, generatePasswordFromName } from '../utils/password.js';
 
 export const adminRouter = Router();
 
@@ -110,6 +111,70 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
     }));
 
     res.json({ users, recent });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/accounts', requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, created_at, last_login_at FROM user_accounts ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Password is generated (from the typed name) rather than admin-supplied —
+// returned once in this response so it can be handed to that person; it's
+// never stored or retrievable in plain text afterward.
+adminRouter.post('/accounts', requireAdmin, async (req, res, next) => {
+  try {
+    const { name } = req.body || {};
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (!trimmed) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const password = generatePasswordFromName(trimmed);
+    const passwordHash = hashPassword(password);
+
+    const { rows } = await pool.query(
+      `INSERT INTO user_accounts (name, password_hash) VALUES ($1, $2) RETURNING id, name, created_at`,
+      [trimmed, passwordHash]
+    );
+    res.status(201).json({ ...rows[0], password });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'An account with that name already exists' });
+    }
+    next(err);
+  }
+});
+
+adminRouter.post('/accounts/:id/reset-password', requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rows: existing } = await pool.query('SELECT name FROM user_accounts WHERE id = $1', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const password = generatePasswordFromName(existing[0].name);
+    const passwordHash = hashPassword(password);
+    await pool.query('UPDATE user_accounts SET password_hash = $1 WHERE id = $2', [passwordHash, id]);
+    res.json({ id: Number(id), name: existing[0].name, password });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/accounts/:id', requireAdmin, async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM user_accounts WHERE id = $1', [req.params.id]);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

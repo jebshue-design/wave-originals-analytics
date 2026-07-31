@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
+import { verifyPassword } from '../utils/password.js';
 
 export const authRouter = Router();
 
@@ -14,16 +15,32 @@ function passwordsMatch(candidate, actual) {
 authRouter.post('/login', async (req, res, next) => {
   try {
     const { password, name } = req.body || {};
-    if (typeof password !== 'string' || !passwordsMatch(password, process.env.APP_PASSWORD || '')) {
-      return res.status(401).json({ error: 'Incorrect password' });
-    }
     const userName = typeof name === 'string' ? name.trim() : '';
     if (!userName) {
       return res.status(400).json({ error: 'Name is required' });
     }
+    if (typeof password !== 'string') {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    // A name matching an admin-created account checks that account's own
+    // password; any other name falls back to the shared APP_PASSWORD, same
+    // as before this feature existed.
+    const { rows } = await pool.query('SELECT * FROM user_accounts WHERE lower(name) = lower($1)', [userName]);
+    const account = rows[0];
+    const ok = account
+      ? verifyPassword(password, account.password_hash)
+      : passwordsMatch(password, process.env.APP_PASSWORD || '');
+    if (!ok) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
     req.session.authenticated = true;
-    req.session.userName = userName;
-    await pool.query('INSERT INTO activity_log (user_name, event_type) VALUES ($1, $2)', [userName, 'login']);
+    req.session.userName = account ? account.name : userName;
+    if (account) {
+      await pool.query('UPDATE user_accounts SET last_login_at = now() WHERE id = $1', [account.id]);
+    }
+    await pool.query('INSERT INTO activity_log (user_name, event_type) VALUES ($1, $2)', [req.session.userName, 'login']);
     res.json({ ok: true });
   } catch (err) {
     next(err);
