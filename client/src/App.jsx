@@ -5,8 +5,11 @@ import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { ShowPage } from './pages/ShowPage';
+import { Admin } from './pages/Admin';
 
-export default function App() {
+// The producer app (shared APP_PASSWORD) — everything except /admin, which
+// has its own independent password and shouldn't be gated behind this one.
+function ProducerApp() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -21,12 +24,21 @@ export default function App() {
   if (!authenticated) return <Login onSuccess={() => setAuthenticated(true)} />;
 
   return (
+    <Routes>
+      <Route element={<Layout onLogout={() => setAuthenticated(false)} />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/shows/:showName" element={<ShowPage />} />
+      </Route>
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
     <BrowserRouter>
       <Routes>
-        <Route element={<Layout onLogout={() => setAuthenticated(false)} />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/shows/:showName" element={<ShowPage />} />
-        </Route>
+        <Route path="/admin/*" element={<Admin />} />
+        <Route path="/*" element={<ProducerApp />} />
       </Routes>
     </BrowserRouter>
   );

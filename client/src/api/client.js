@@ -19,9 +19,15 @@ async function request(path, options = {}) {
 
 export const api = {
   getSession: () => request('/auth/session'),
-  login: (password) =>
-    request('/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  login: (password, name) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ password, name }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  logPageView: (path) => request('/activity/pageview', { method: 'POST', body: JSON.stringify({ path }) }),
+  adminLogin: (password) =>
+    request('/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  adminLogout: () => request('/admin/logout', { method: 'POST' }),
+  getAdminSession: () => request('/admin/session'),
+  getActivity: () => request('/admin/activity'),
   getShows: () => request('/shows'),
   getEpisodes: (show) => request(`/episodes${show ? `?show=${encodeURIComponent(show)}` : ''}`),
   getEpisode: (id) => request(`/episodes/${id}`),

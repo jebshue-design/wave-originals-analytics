@@ -8,6 +8,8 @@ import { authRouter, requireAuth } from './routes/auth.js';
 import { episodesRouter } from './routes/episodes.js';
 import { syncRouter } from './routes/sync.js';
 import { cronRouter } from './routes/cron.js';
+import { activityRouter } from './routes/activity.js';
+import { adminRouter } from './routes/admin.js';
 
 // Just the API — no static file serving or app.listen() here, so this same
 // app can be wrapped for a serverless deploy (Vercel) or run directly for
@@ -52,6 +54,10 @@ app.use('/api/auth', authRouter);
 // Not requireAuth-gated — protected by its own shared-secret check instead,
 // since a scheduled cron job has no browser session to authenticate with.
 app.use('/api', cronRouter);
+// Its own login gate (ADMIN_PASSWORD / req.session.isAdmin) — deliberately
+// not requireAuth, so it's independent of the shared producer password.
+app.use('/api/admin', adminRouter);
+app.use('/api', requireAuth, activityRouter);
 app.use('/api', requireAuth, episodesRouter);
 app.use('/api', requireAuth, syncRouter);
 

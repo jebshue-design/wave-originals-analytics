@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { WaveMark } from './WaveMark';
 
 export function Layout({ onLogout }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const location = useLocation();
 
   useEffect(() => {
     if (theme === 'light') {
@@ -14,6 +15,10 @@ export function Layout({ onLogout }) {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    api.logPageView(location.pathname).catch(() => {});
+  }, [location.pathname]);
 
   async function handleLogout() {
     await api.logout();

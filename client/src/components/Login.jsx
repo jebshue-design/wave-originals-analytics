@@ -3,16 +3,21 @@ import { api } from '../api/client';
 import { WaveMark } from './WaveMark';
 
 export function Login({ onSuccess }) {
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!name.trim()) {
+      setError('Enter your name.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      await api.login(password);
+      await api.login(password, name.trim());
       onSuccess();
     } catch (err) {
       setError('Incorrect password.');
@@ -28,11 +33,17 @@ export function Login({ onSuccess }) {
         <h1 className="login-title">Episode Performance</h1>
         <p className="spec login-subtitle">Producer access only</p>
         <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name"
+          autoFocus
+        />
+        <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          autoFocus
         />
         {error && <p className="form-error spec">{error}</p>}
         <button type="submit" className="btn-primary" disabled={submitting}>

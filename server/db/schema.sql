@@ -97,3 +97,18 @@ CREATE TABLE IF NOT EXISTS show_thumbnail_patterns (
   episode_count INTEGER NOT NULL,
   generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Lightweight per-user activity trail: who logged in (name is free-text,
+-- captured at the shared login screen — there's no real per-user auth) and
+-- what pages they visited afterward. Viewed only from the separate,
+-- independently-password-protected /admin page.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id SERIAL PRIMARY KEY,
+  user_name TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('login', 'page_view')),
+  path TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_log_user_name ON activity_log (user_name);
