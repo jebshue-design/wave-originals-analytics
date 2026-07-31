@@ -237,8 +237,9 @@ adminRouter.delete('/accounts/:id', requireAdmin, async (req, res, next) => {
 // Returns a standalone HTML document (not JSON) — meant to be opened
 // directly in a browser tab for a biweekly producer meeting, not consumed
 // by the SPA's own fetch/render cycle. Accepts an explicit start/end date
-// range (falls back to the last 14 days) and a comma-separated `stats` list
-// (falls back to DEFAULT_STAT_KEYS) — both validated here rather than
+// range (falls back to the last 14 days), a comma-separated `stats` list
+// (falls back to DEFAULT_STAT_KEYS), and an optional comma-separated `shows`
+// list (empty/omitted means every show) — all parsed here rather than
 // trusted as-is from the query string.
 adminRouter.get('/meeting-deck', requireAdmin, async (req, res, next) => {
   try {
@@ -251,10 +252,15 @@ adminRouter.get('/meeting-deck', requireAdmin, async (req, res, next) => {
     const requestedStats = typeof req.query.stats === 'string' ? req.query.stats.split(',').map((s) => s.trim()) : [];
     const statKeys = requestedStats.filter((key) => STAT_KEYS.includes(key));
 
+    const showNames = typeof req.query.shows === 'string'
+      ? req.query.shows.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+
     const html = await generateMeetingDeckHtml(pool, {
       start,
       end,
       statKeys: statKeys.length > 0 ? statKeys : DEFAULT_STAT_KEYS,
+      showNames: showNames.length > 0 ? showNames : null,
     });
     res.set('Content-Type', 'text/html; charset=utf-8').send(html);
   } catch (err) {

@@ -507,11 +507,24 @@ function MeetingDeckPanel() {
   const [startDate, setStartDate] = useState(() => isoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)));
   const [endDate, setEndDate] = useState(() => isoDate(new Date()));
   const [selectedStats, setSelectedStats] = useState(DEFAULT_DECK_STATS);
+  const [shows, setShows] = useState([]);
+  const [selectedShows, setSelectedShows] = useState(null); // null until shows load, then defaults to "all"
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    api.getShows().then((res) => {
+      setShows(res);
+      setSelectedShows(res.map((s) => s.show_name));
+    });
+  }, []);
+
   function toggleStat(key) {
     setSelectedStats((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  function toggleShow(showName) {
+    setSelectedShows((prev) => (prev.includes(showName) ? prev.filter((s) => s !== showName) : [...prev, showName]));
   }
 
   // Opens the tab synchronously (before the fetch starts) so the browser
@@ -524,6 +537,10 @@ function MeetingDeckPanel() {
       setError('Pick at least one stat to show.');
       return;
     }
+    if (!selectedShows || selectedShows.length === 0) {
+      setError('Pick at least one show to include.');
+      return;
+    }
     const win = window.open('', '_blank');
     if (!win) {
       setError('Your browser blocked the new tab — allow pop-ups for this site and try again.');
@@ -534,7 +551,12 @@ function MeetingDeckPanel() {
     );
     setGenerating(true);
     try {
-      const params = new URLSearchParams({ start: startDate, end: endDate, stats: selectedStats.join(',') });
+      const params = new URLSearchParams({
+        start: startDate,
+        end: endDate,
+        stats: selectedStats.join(','),
+        shows: selectedShows.join(','),
+      });
       const res = await fetch(`/api/admin/meeting-deck?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Could not generate the deck.');
       const html = await res.text();
@@ -568,6 +590,28 @@ function MeetingDeckPanel() {
               End
             </label>
             <input id="deck-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+
+          <div className="meeting-deck-row meeting-deck-stats-row">
+            <span className="spec">Shows to include</span>
+            <div className="meeting-deck-stat-toggles">
+              <button type="button" className="meeting-deck-stat-toggle" onClick={() => setSelectedShows(shows.map((s) => s.show_name))}>
+                All
+              </button>
+              <button type="button" className="meeting-deck-stat-toggle" onClick={() => setSelectedShows([])}>
+                None
+              </button>
+              {shows.map((s) => (
+                <button
+                  type="button"
+                  key={s.show_name}
+                  className={`meeting-deck-stat-toggle${selectedShows?.includes(s.show_name) ? ' is-selected' : ''}`}
+                  onClick={() => toggleShow(s.show_name)}
+                >
+                  {s.show_name}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="meeting-deck-row meeting-deck-stats-row">

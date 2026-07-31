@@ -145,8 +145,13 @@ function renderEpisodeCard(ep, notes, statKeys) {
     })
     .join('');
 
+  const thumb = thumbnailUrl(ep);
+
   return `
     <article class="episode-card">
+      <div class="episode-card-inner">
+        ${thumb ? `<img class="episode-thumb" src="${escapeHtml(thumb)}" alt="" loading="lazy" />` : ''}
+        <div class="episode-card-body">
       <div class="episode-card-head">
         <h3>${escapeHtml(ep.episode_title)}</h3>
         <span class="episode-date">${formatDate(ep.published_at)}</span>
@@ -167,6 +172,8 @@ function renderEpisodeCard(ep, notes, statKeys) {
             </div>`
           : ''
       }
+        </div>
+      </div>
     </article>`;
 }
 
@@ -272,6 +279,9 @@ const PAGE_STYLE = `
   }
   .episode-list { display: flex; flex-direction: column; gap: 16px; }
   .episode-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px 20px; }
+  .episode-card-inner { display: flex; gap: 16px; }
+  .episode-thumb { width: 160px; height: 90px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: rgba(255,255,255,0.06); }
+  .episode-card-body { flex: 1; min-width: 0; }
   .episode-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .episode-card-head h3 { margin: 0; font-size: 15px; }
   .episode-date { font: 500 11px/1.4 ui-monospace, monospace; color: #a8a29a; flex-shrink: 0; }
@@ -286,6 +296,10 @@ const PAGE_STYLE = `
   .episode-notes { font-size: 12px; border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 10px; }
   .episode-notes-label { font: 500 10px/1.4 ui-monospace, monospace; letter-spacing: 0.04em; text-transform: uppercase; color: #a8a29a; }
   .episode-notes ul { margin: 6px 0 0; padding-left: 18px; }
+  @media (max-width: 640px) {
+    .episode-card-inner { flex-direction: column; }
+    .episode-thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+  }
   @media print {
     body { background: #fff; color: #111; }
     .deck-toc { display: none; }
@@ -293,6 +307,10 @@ const PAGE_STYLE = `
     .episode-card { break-inside: avoid; }
   }
 `;
+
+function thumbnailUrl(ep) {
+  return ep.youtube_video_id ? `https://i.ytimg.com/vi/${ep.youtube_video_id}/hqdefault.jpg` : null;
+}
 
 // Builds the full standalone HTML document for a biweekly meeting deck:
 // per-show aggregate stats + an AI-written discussion takeaway, then every
@@ -302,16 +320,18 @@ const PAGE_STYLE = `
 // so hitting the route opens/prints like a real document.
 //
 // `start`/`end` are Date objects (inclusive); `statKeys` is the ordered list
-// of STAT_CATALOG keys to display at both the show and episode level — the
-// caller (the admin route) is responsible for defaulting/validating these.
-export async function generateMeetingDeckHtml(pool, { start, end, statKeys = DEFAULT_STAT_KEYS } = {}) {
+// of STAT_CATALOG keys to display at both the show and episode level;
+// `showNames`, if given and non-empty, limits the deck to just those shows —
+// the caller (the admin route) is responsible for defaulting/validating all
+// three.
+export async function generateMeetingDeckHtml(pool, { start, end, statKeys = DEFAULT_STAT_KEYS, showNames = null } = {}) {
   const windowStart = start;
   const windowEnd = end;
   const windowLabel = `${formatDate(windowStart)} – ${formatDate(windowEnd)}`;
   const selectedStats = statKeys.filter((key) => STAT_KEYS.includes(key));
 
   const { rows: episodes } = await pool.query(
-    `SELECT e.episode_id, e.show_name, e.episode_title, e.published_at, e.ai_insight,
+    `SELECT e.episode_id, e.show_name, e.episode_title, e.published_at, e.ai_insight, e.youtube_video_id,
             e.total_performance_combined, e.audio_downloads_total, e.youtube_views_total,
             e.ctr_1hr, e.ctr_24hr, e.first_dropoff_pct,
             (SELECT AVG(c.retention) FROM episode_retention_curve c WHERE c.episode_id = e.episode_id) AS avg_watch_pct
@@ -342,6 +362,8 @@ export async function generateMeetingDeckHtml(pool, { start, end, statKeys = DEF
 
   const shows = [];
   for (const [showName, showEpisodes] of byShow) {
+    if (showNames && showNames.length > 0 && !showNames.includes(showName)) continue;
+
     const windowEpisodes = showEpisodes.filter((ep) => {
       if (!ep.published_at) return false;
       const published = new Date(ep.published_at);
