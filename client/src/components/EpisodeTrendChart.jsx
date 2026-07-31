@@ -3,15 +3,15 @@ import { formatCompactNumber, formatDate } from '../utils/format';
 import { trendStatus } from '../utils/stats';
 
 const WIDTH = 760;
-const HEIGHT = 320;
-const PAD_LEFT = 56;
-const PAD_RIGHT = 20;
-const PAD_TOP = 28;
-const PAD_BOTTOM = 36;
+const HEIGHT = 160;
+const PAD_LEFT = 48;
+const PAD_RIGHT = 16;
+const PAD_TOP = 16;
+const PAD_BOTTOM = 20;
 const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 const PLOT_H = HEIGHT - PAD_TOP - PAD_BOTTOM;
 const MAX_EPISODES = 10;
-const Y_TICK_COUNT = 4;
+const Y_TICK_COUNT = 3;
 const BAR_WIDTH_RATIO = 0.56; // fraction of each episode's slot the bar itself occupies
 const SEGMENT_GAP = 2; // visual gap between the stacked audio/youtube segments
 
@@ -90,21 +90,24 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
 
   return (
     <div className="episode-bar-chart">
-      <div className="chart-legend">
-        <span className="legend-item">
-          <span className="channel-swatch" style={{ background: 'var(--series-downloads)' }} />
-          Audio Downloads
-        </span>
-        <span className="legend-item">
-          <span className="channel-swatch" style={{ background: 'var(--series-views)' }} />
-          YouTube Views
-        </span>
-        {baselineTotal !== null && (
+      <div className="toolbar episode-bar-chart-header">
+        <h2 className="detail-section-title">Performance Over Time</h2>
+        <div className="chart-legend">
           <span className="legend-item">
-            <span className="legend-line legend-line-dashed" />
-            Current baseline (total)
+            <span className="channel-swatch" style={{ background: 'var(--series-downloads)' }} />
+            Audio
           </span>
-        )}
+          <span className="legend-item">
+            <span className="channel-swatch" style={{ background: 'var(--series-views)' }} />
+            YouTube
+          </span>
+          {baselineTotal !== null && (
+            <span className="legend-item">
+              <span className="legend-line legend-line-dashed" />
+              Baseline
+            </span>
+          )}
+        </div>
       </div>
       <svg
         ref={svgRef}

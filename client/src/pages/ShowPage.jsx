@@ -91,7 +91,6 @@ export function ShowPage() {
       </div>
 
       <section className="show-section">
-        <h2 className="detail-section-title">Performance Over Time</h2>
         <EpisodeTrendChart
           episodes={episodes}
           trailingBaselines={trailingBaselines}
