@@ -24,7 +24,9 @@ authRouter.post('/logout', (req, res) => {
 });
 
 authRouter.get('/session', (req, res) => {
+  console.log('[diag] /session handler entered', Date.now());
   res.json({ authenticated: Boolean(req.session.authenticated) });
+  console.log('[diag] /session handler responded', Date.now());
 });
 
 export function requireAuth(req, res, next) {

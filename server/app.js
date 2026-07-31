@@ -15,6 +15,13 @@ export const app = express();
 
 const PgSession = connectPgSimple(session);
 
+console.log('[diag] app.js module evaluated', Date.now());
+
+app.use((req, res, next) => {
+  console.log('[diag] request received', req.method, req.path, Date.now());
+  next();
+});
+
 app.use(express.json());
 app.use(
   cors({
@@ -22,6 +29,10 @@ app.use(
     credentials: true,
   })
 );
+app.use((req, res, next) => {
+  console.log('[diag] before session middleware', Date.now());
+  next();
+});
 app.use(
   session({
     // Sessions are stored in Postgres (not the default in-memory store)
@@ -40,6 +51,11 @@ app.use(
     },
   })
 );
+
+app.use((req, res, next) => {
+  console.log('[diag] after session middleware', Date.now());
+  next();
+});
 
 app.use('/api/auth', authRouter);
 app.use('/api', requireAuth, episodesRouter);
