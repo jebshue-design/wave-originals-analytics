@@ -10,6 +10,7 @@ import { EpisodeDetail } from '../components/EpisodeDetail';
 import { ThumbnailLeaderboard } from '../components/ThumbnailLeaderboard';
 import { ShowChat } from '../components/ShowChat';
 import { ShowHero } from '../components/ShowHero';
+import { EpisodeTrendChart } from '../components/EpisodeTrendChart';
 import { computeTrailingBaselines, computeCurrentBaselines, TREND_METRIC_KEYS } from '../utils/stats';
 
 export function ShowPage() {
@@ -88,6 +89,15 @@ export function ShowPage() {
           <CurrentBaselines episodes={episodes} />
         </div>
       </div>
+
+      <section className="show-section">
+        <h2 className="detail-section-title">Performance Over Time</h2>
+        <EpisodeTrendChart
+          episodes={episodes}
+          trailingBaselines={trailingBaselines}
+          currentBaseline={currentBaseline}
+        />
+      </section>
 
       <section className="show-section">
         <h2 className="detail-section-title">Ask about this show</h2>
