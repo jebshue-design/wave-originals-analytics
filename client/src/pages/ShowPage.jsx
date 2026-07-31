@@ -13,6 +13,7 @@ import { ShowHero } from '../components/ShowHero';
 import { EpisodeTrendChart } from '../components/EpisodeTrendChart';
 import { computeTrailingBaselines, computeCurrentBaselines, TREND_METRIC_KEYS } from '../utils/stats';
 import { accentForIndex } from '../config/palette';
+import { SHOW_ART_COLOR } from '../config/showArtColor';
 
 export function ShowPage() {
   const { showName } = useParams();
@@ -96,7 +97,7 @@ export function ShowPage() {
           episodes={episodes}
           trailingBaselines={trailingBaselines}
           currentBaseline={currentBaseline}
-          accentColor={accentForIndex(Math.max(showIndex, 0))}
+          accentColor={SHOW_ART_COLOR[decodedShowName] || accentForIndex(Math.max(showIndex, 0))}
         />
       </section>
 
