@@ -5,4 +5,5 @@ export const EXCLUDED_SHOWS = [
   'Fitz & Whit | Ryan Fitzpatrick & Andrew Whitworth',
   'New Heights with Jason and Travis Kelce',
   'Closed on Sundays with Pat Surtain & Terrion Arnold',
+  'My Momma Told Me',
 ];
