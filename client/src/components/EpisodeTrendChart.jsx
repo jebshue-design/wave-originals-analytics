@@ -24,7 +24,7 @@ const STATUS_COLOR_VAR = {
   bad: 'var(--intent-danger)',
 };
 const STATUS_ICON = { good: '▲', average: '●', bad: '▼' };
-const STATUS_LABEL = { good: 'good', average: 'average', bad: 'needs attention' };
+const STATUS_PHRASE = { good: 'Above average', average: 'Average', bad: 'Below average' };
 
 // Short enough (e.g. "7/22") to sit under every bar without the x-axis
 // turning into a wall of text — the full date is still in the tooltip.
@@ -98,8 +98,8 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           </span>
           {baselineTotal !== null && (
             <span className="legend-item">
-              <span className="legend-line legend-line-dashed" />
-              Baseline
+              <span className="legend-line legend-line-dashed" style={{ borderTopColor: 'var(--intent-info)' }} />
+              Baseline: {formatCompactNumber(baselineTotal)}
             </span>
           )}
         </div>
@@ -132,7 +132,7 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
                 x2={WIDTH - PAD_RIGHT}
                 y1={yFor(baselineTotal)}
                 y2={yFor(baselineTotal)}
-                stroke="var(--fg-muted)"
+                stroke="var(--intent-info)"
                 strokeWidth="1.5"
                 strokeDasharray="5 3"
               />
@@ -141,7 +141,7 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
                 y={yFor(baselineTotal) - 4}
                 textAnchor="end"
                 className="chart-tick"
-                fill="var(--fg-muted)"
+                fill="var(--intent-info)"
               >
                 Baseline {formatCompactNumber(baselineTotal)}
               </text>
@@ -177,33 +177,42 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           })}
         </svg>
 
-        {/* Hover targets are plain HTML (not SVG) so the tooltip can reuse
-            the same info-tip-style data-tooltip/::after pattern used
-            everywhere else in the app, instead of a hand-drawn SVG box. */}
+        {/* Hover targets are plain HTML (not SVG). The tooltip is real JSX
+            (not a data-tooltip/::after attr string) specifically so labels
+            like "Total"/"Audio"/"YouTube" can be bolded — attr()-based
+            tooltips can only ever render plain text. */}
         {bars.map((b, i) => {
           const status = trendStatus(b.total, trailingBaselines?.get(b.ep.episode_id)?.total_performance_combined);
           const title = b.ep.episode_title.length > 60 ? `${b.ep.episode_title.slice(0, 60)}…` : b.ep.episode_title;
-          const tooltip = [
-            `"${title}" — ${formatDate(b.ep.published_at)}`,
-            `• Total: ${formatCompactNumber(b.total)}`,
-            `• Audio: ${formatCompactNumber(b.audio)}`,
-            `• YouTube: ${formatCompactNumber(b.youtube)}`,
-            status ? `• ${STATUS_LABEL[status]} vs. typical` : null,
-          ]
-            .filter(Boolean)
-            .join('\n');
+          const isHovered = i === hoverIndex;
+
           return (
             <span
               key={b.ep.episode_id}
               className="chart-bar-trigger"
               tabIndex={0}
-              data-tooltip={tooltip}
               style={{ left: `${(i / bars.length) * 100}%`, width: `${(1 / bars.length) * 100}%` }}
               onMouseEnter={() => setHoverIndex(i)}
               onMouseLeave={() => setHoverIndex(null)}
               onFocus={() => setHoverIndex(i)}
               onBlur={() => setHoverIndex(null)}
-            />
+            >
+              <span className={`chart-bar-tooltip${isHovered ? ' is-visible' : ''}`}>
+                <div>
+                  &quot;{title}&quot; — {formatDate(b.ep.published_at)}
+                </div>
+                <div>
+                  • <strong>Total:</strong> {formatCompactNumber(b.total)}
+                </div>
+                <div>
+                  • <strong>Audio:</strong> {formatCompactNumber(b.audio)}
+                </div>
+                <div>
+                  • <strong>YouTube:</strong> {formatCompactNumber(b.youtube)}
+                </div>
+                {status && <div>• {STATUS_PHRASE[status]}</div>}
+              </span>
+            </span>
           );
         })}
       </div>

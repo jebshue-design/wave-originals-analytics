@@ -1352,8 +1352,7 @@
   cursor: help;
 }
 
-.chart-bar-trigger::after {
-  content: attr(data-tooltip);
+.chart-bar-tooltip {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 50%;
@@ -1366,9 +1365,6 @@
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   font: 400 12px/1.5 var(--font-sans);
-  text-transform: none;
-  letter-spacing: normal;
-  white-space: pre-line;
   text-align: left;
   opacity: 0;
   pointer-events: none;
@@ -1376,14 +1372,17 @@
   z-index: 10;
 }
 
-.chart-bar-trigger:hover::after,
-.chart-bar-trigger:focus-visible::after {
+.chart-bar-tooltip.is-visible {
   opacity: 1;
   transform: translate(-50%, 0);
 }
 
+.chart-bar-tooltip strong {
+  color: var(--fg);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .chart-bar-trigger::after {
+  .chart-bar-tooltip {
     transition: none;
   }
 }
