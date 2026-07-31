@@ -1335,6 +1335,53 @@
   display: block;
 }
 
+.chart-bar-wrap {
+  position: relative;
+}
+
+.chart-bar-trigger {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  cursor: help;
+}
+
+.chart-bar-trigger::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  width: max-content;
+  max-width: 220px;
+  background: var(--bg-elev-1);
+  color: var(--fg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font: 400 12px/1.4 var(--font-sans);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+  z-index: 10;
+}
+
+.chart-bar-trigger:hover::after,
+.chart-bar-trigger:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar-trigger::after {
+    transition: none;
+  }
+}
+
 .episode-bar-chart-header {
   margin-bottom: 8px;
 }

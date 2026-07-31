@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { formatCompactNumber, formatDate } from '../utils/format';
 import { trendStatus } from '../utils/stats';
 
@@ -24,10 +24,10 @@ const STATUS_COLOR_VAR = {
   bad: 'var(--intent-danger)',
 };
 const STATUS_ICON = { good: '▲', average: '●', bad: '▼' };
+const STATUS_LABEL = { good: 'good', average: 'average', bad: 'needs attention' };
 
 export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline }) {
   const [hoverIndex, setHoverIndex] = useState(null);
-  const svgRef = useRef(null);
 
   const recent = [...episodes]
     .filter(
@@ -75,16 +75,6 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
     return PAD_LEFT + slotWidth * (i + 0.5);
   }
 
-  function handleMove(e) {
-    const rect = svgRef.current.getBoundingClientRect();
-    const relX = ((e.clientX - rect.left) / rect.width) * WIDTH;
-    const index = Math.min(bars.length - 1, Math.max(0, Math.floor((relX - PAD_LEFT) / slotWidth)));
-    setHoverIndex(index);
-  }
-
-  const hovered = hoverIndex !== null ? bars[hoverIndex] : null;
-  const hoverStatus = hovered ? trendStatus(hovered.total, trailingBaselines?.get(hovered.ep.episode_id)?.total_performance_combined) : null;
-
   return (
     <div className="episode-bar-chart">
       <div className="toolbar episode-bar-chart-header">
@@ -106,107 +96,91 @@ export function EpisodeTrendChart({ episodes, trailingBaselines, currentBaseline
           )}
         </div>
       </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={`Total performance across the last ${bars.length} episodes, split into audio downloads and YouTube views`}
-        onMouseMove={handleMove}
-        onMouseLeave={() => setHoverIndex(null)}
-      >
-        <text x={PAD_LEFT - 6} y={yFor(maxValue) + 3} textAnchor="end" className="chart-tick">
-          {formatCompactNumber(maxValue)}
-        </text>
-        <text x={PAD_LEFT - 6} y={HEIGHT - PAD_BOTTOM} textAnchor="end" className="chart-tick">
-          0
-        </text>
+      <div className="chart-bar-wrap">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          role="img"
+          aria-label={`Total performance across the last ${bars.length} episodes, split into audio downloads and YouTube views`}
+        >
+          <text x={PAD_LEFT - 6} y={yFor(maxValue) + 3} textAnchor="end" className="chart-tick">
+            {formatCompactNumber(maxValue)}
+          </text>
+          <text x={PAD_LEFT - 6} y={HEIGHT - PAD_BOTTOM} textAnchor="end" className="chart-tick">
+            0
+          </text>
 
-        <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={HEIGHT - PAD_BOTTOM} y2={HEIGHT - PAD_BOTTOM} stroke="var(--line)" strokeWidth="1" />
+          <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={HEIGHT - PAD_BOTTOM} y2={HEIGHT - PAD_BOTTOM} stroke="var(--line)" strokeWidth="1" />
 
-        <text x={PAD_LEFT} y={HEIGHT - 4} textAnchor="start" className="chart-tick">
-          {formatDate(recent[0].published_at)}
-        </text>
-        <text x={WIDTH - PAD_RIGHT} y={HEIGHT - 4} textAnchor="end" className="chart-tick">
-          {formatDate(recent[recent.length - 1].published_at)}
-        </text>
+          <text x={PAD_LEFT} y={HEIGHT - 4} textAnchor="start" className="chart-tick">
+            {formatDate(recent[0].published_at)}
+          </text>
+          <text x={WIDTH - PAD_RIGHT} y={HEIGHT - 4} textAnchor="end" className="chart-tick">
+            {formatDate(recent[recent.length - 1].published_at)}
+          </text>
 
-        {baselineTotal !== null && (
-          <line
-            x1={PAD_LEFT}
-            x2={WIDTH - PAD_RIGHT}
-            y1={yFor(baselineTotal)}
-            y2={yFor(baselineTotal)}
-            stroke="var(--fg-dim)"
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-        )}
+          {baselineTotal !== null && (
+            <line
+              x1={PAD_LEFT}
+              x2={WIDTH - PAD_RIGHT}
+              y1={yFor(baselineTotal)}
+              y2={yFor(baselineTotal)}
+              stroke="var(--fg-dim)"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+          )}
 
+          {bars.map((b, i) => {
+            const cx = slotCenter(i);
+            const x = cx - barWidth / 2;
+            const audioTop = yFor(b.audio);
+            const audioHeight = HEIGHT - PAD_BOTTOM - audioTop;
+            const youtubeBottom = audioTop - SEGMENT_GAP;
+            const youtubeTop = yFor(b.total);
+            const youtubeHeight = Math.max(0, youtubeBottom - youtubeTop);
+            const status = trendStatus(b.total, trailingBaselines?.get(b.ep.episode_id)?.total_performance_combined);
+
+            return (
+              <g key={b.ep.episode_id}>
+                {i === hoverIndex && (
+                  <rect x={PAD_LEFT + slotWidth * i} y={PAD_TOP} width={slotWidth} height={PLOT_H} fill="var(--bg-elev-2)" />
+                )}
+                <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--fg-dim)" />
+                {youtubeHeight > 0 && (
+                  <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--volt)" />
+                )}
+                {status && (
+                  <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
+                    {STATUS_ICON[status]}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Hover targets are plain HTML (not SVG) so the tooltip can reuse
+            the same info-tip-style data-tooltip/::after pattern used
+            everywhere else in the app, instead of a hand-drawn SVG box. */}
         {bars.map((b, i) => {
-          const cx = slotCenter(i);
-          const x = cx - barWidth / 2;
-          const audioTop = yFor(b.audio);
-          const audioHeight = HEIGHT - PAD_BOTTOM - audioTop;
-          const youtubeBottom = audioTop - SEGMENT_GAP;
-          const youtubeTop = yFor(b.total);
-          const youtubeHeight = Math.max(0, youtubeBottom - youtubeTop);
           const status = trendStatus(b.total, trailingBaselines?.get(b.ep.episode_id)?.total_performance_combined);
-          const isHovered = i === hoverIndex;
-
+          const title = b.ep.episode_title.length > 60 ? `${b.ep.episode_title.slice(0, 60)}…` : b.ep.episode_title;
+          const tooltip = `${formatDate(b.ep.published_at)} — "${title}". Total ${formatCompactNumber(b.total)} (Audio ${formatCompactNumber(b.audio)}, YouTube ${formatCompactNumber(b.youtube)})${status ? `, ${STATUS_LABEL[status]} vs. typical` : ''}.`;
           return (
-            <g key={b.ep.episode_id}>
-              {isHovered && (
-                <rect
-                  x={PAD_LEFT + slotWidth * i}
-                  y={PAD_TOP}
-                  width={slotWidth}
-                  height={PLOT_H}
-                  fill="var(--bg-elev-2)"
-                />
-              )}
-              <rect x={x} y={audioTop} width={barWidth} height={Math.max(0, audioHeight)} fill="var(--fg-dim)" />
-              {youtubeHeight > 0 && (
-                <rect x={x} y={youtubeTop} width={barWidth} height={youtubeHeight} fill="var(--volt)" />
-              )}
-              {status && (
-                <text x={cx} y={yFor(b.total) - 6} textAnchor="middle" fill={STATUS_COLOR_VAR[status]} fontSize="9">
-                  {STATUS_ICON[status]}
-                </text>
-              )}
-            </g>
+            <span
+              key={b.ep.episode_id}
+              className="chart-bar-trigger"
+              tabIndex={0}
+              data-tooltip={tooltip}
+              style={{ left: `${(i / bars.length) * 100}%`, width: `${(1 / bars.length) * 100}%` }}
+              onMouseEnter={() => setHoverIndex(i)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onFocus={() => setHoverIndex(i)}
+              onBlur={() => setHoverIndex(null)}
+            />
           );
         })}
-
-        {hovered && (
-          <EpisodeTooltip x={slotCenter(hoverIndex)} bar={hovered} status={hoverStatus} />
-        )}
-      </svg>
+      </div>
     </div>
-  );
-}
-
-function EpisodeTooltip({ x, bar, status }) {
-  const title = bar.ep.episode_title.length > 44 ? `${bar.ep.episode_title.slice(0, 44)}…` : bar.ep.episode_title;
-  const lines = [
-    formatDate(bar.ep.published_at),
-    title,
-    `Total: ${formatCompactNumber(bar.total)}`,
-    `Audio: ${formatCompactNumber(bar.audio)}  ·  YouTube: ${formatCompactNumber(bar.youtube)}`,
-  ];
-  if (status) lines.push(`${STATUS_ICON[status]} ${status} vs. typical`);
-
-  const boxWidth = 220;
-  const boxHeight = lines.length * 13 + 10;
-  const clampedX = Math.min(WIDTH - PAD_RIGHT - boxWidth, Math.max(PAD_LEFT, x - boxWidth / 2));
-
-  return (
-    <g>
-      <rect x={clampedX} y={PAD_TOP} width={boxWidth} height={boxHeight} fill="var(--bg-elev-2)" stroke="var(--line-strong)" />
-      {lines.map((line, i) => (
-        <text key={i} x={clampedX + 8} y={PAD_TOP + 13 + i * 13} className="chart-tooltip-text">
-          {line}
-        </text>
-      ))}
-    </g>
   );
 }
