@@ -85,6 +85,18 @@ function formatCorrelations(episodes, targetKey, targetLabel) {
     .join('; ');
 }
 
+// Same shape as the note summary in ai/generateMeetingDeck.js and
+// ai/generateInsights.js — duplicated locally rather than shared since each
+// caller only needs this one line of formatting.
+function noteSummary(note) {
+  const parts = [];
+  if (note.thumbnail_tried) parts.push(`Thumbnail: ${note.thumbnail_tried}`);
+  if (note.hook_tried) parts.push(`Hook: ${note.hook_tried}`);
+  const outcome = note.outcome ? ` (${note.outcome.replace(/_/g, ' ')})` : '';
+  const extra = note.notes ? ` — ${note.notes}` : '';
+  return `${parts.join('; ')}${outcome}${extra}`;
+}
+
 function relDeviation(value, baseline) {
   if (value === null || value === undefined || baseline === null || baseline === undefined || baseline === 0) {
     return null;
@@ -179,6 +191,22 @@ async function buildShowContext(pool, showName) {
   );
   if (episodes.length === 0) return null;
 
+  // Fetched for every episode (not just ones the model asks about) since a
+  // question like "have we changed anything about hooks lately" needs to
+  // scan across episodes to answer at all.
+  const { rows: noteRows } = await pool.query(
+    `SELECT episode_id, author_name, thumbnail_tried, hook_tried, outcome, notes
+     FROM episode_notes
+     WHERE episode_id = ANY($1)
+     ORDER BY created_at ASC`,
+    [episodes.map((ep) => ep.episode_id)]
+  );
+  const notesByEpisode = new Map();
+  for (const note of noteRows) {
+    if (!notesByEpisode.has(note.episode_id)) notesByEpisode.set(note.episode_id, []);
+    notesByEpisode.get(note.episode_id).push(note);
+  }
+
   const trailingBaselines = computeTrailingBaselines(episodes, TREND_KEYS);
   const currentBaseline = computeCurrentBaselines(episodes, TREND_KEYS);
 
@@ -223,10 +251,17 @@ async function buildShowContext(pool, showName) {
     ]);
     const payoffStatus = trendStatus(ep.avg_watch_pct, baseline.avg_watch_pct);
     const date = ep.published_at ? new Date(ep.published_at).toISOString().slice(0, 10) : 'unknown date';
-    lines.push(
+    let line =
       `- "${ep.episode_title}" (${date}): Hook ${hookStatus || 'n/a'}, Payoff ${payoffStatus || 'n/a'}, ` +
-        `total performance ${ep.total_performance_combined ?? 'n/a'}, ctr_1hr ${ep.ctr_1hr ?? 'n/a'}, ctr_24hr ${ep.ctr_24hr ?? 'n/a'}`
-    );
+      `total performance ${ep.total_performance_combined ?? 'n/a'}, ctr_1hr ${ep.ctr_1hr ?? 'n/a'}, ctr_24hr ${ep.ctr_24hr ?? 'n/a'}`;
+
+    const episodeNotes = notesByEpisode.get(ep.episode_id);
+    if (episodeNotes && episodeNotes.length > 0) {
+      const noteText = episodeNotes.map((n) => `${n.author_name} tried ${noteSummary(n)}`).join('; ');
+      line += ` — producer notes: ${noteText}`;
+    }
+
+    lines.push(line);
   }
   lines.push('');
 
@@ -246,7 +281,7 @@ async function buildShowContext(pool, showName) {
   return lines.join('\n');
 }
 
-const SYSTEM_PROMPT_PREFIX = `You are a podcast/YouTube analytics assistant helping a producer understand ONE specific show. Answer only using the data provided below — if something isn't covered by it, say you don't have that data rather than guessing. Keep answers conversational and to the point (a few sentences, occasionally a short list) — this is a chat, not a report. Cite specific episode titles or numbers when they support your answer. "The Hook" means click-through + early drop-off (did people click and stay past the open); "The Payoff" means average watch-through (did they keep watching once in).
+const SYSTEM_PROMPT_PREFIX = `You are a podcast/YouTube analytics assistant helping a producer understand ONE specific show. Answer only using the data provided below — if something isn't covered by it, say you don't have that data rather than guessing. Keep answers conversational and to the point (a few sentences, occasionally a short list) — this is a chat, not a report. Cite specific episode titles or numbers when they support your answer. "The Hook" means click-through + early drop-off (did people click and stay past the open); "The Payoff" means average watch-through (did they keep watching once in). Some episodes have producer notes attached (what a producer tried — a thumbnail or hook change — and whether it worked); pull these in whenever they're relevant to the question (e.g. "did that change help," "what have we tried," a request for what to do differently), but don't force them into answers that aren't about what was tried or changed.
 
 DATA FOR THIS SHOW:
 `;
