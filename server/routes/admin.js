@@ -168,13 +168,14 @@ adminRouter.get('/activity', requireAdmin, async (req, res, next) => {
 adminRouter.get('/accounts', requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, password_encrypted, created_at, last_login_at FROM user_accounts ORDER BY created_at DESC`
+      `SELECT id, name, password_encrypted, must_change_password, created_at, last_login_at FROM user_accounts ORDER BY created_at DESC`
     );
     res.json(
       rows.map((row) => ({
         id: row.id,
         name: row.name,
         password: decryptPassword(row.password_encrypted),
+        mustChangePassword: row.must_change_password,
         created_at: row.created_at,
         last_login_at: row.last_login_at,
       }))
@@ -218,7 +219,12 @@ adminRouter.post('/accounts/:id/reset-password', requireAdmin, async (req, res, 
 
     const password = generatePasswordFromName(existing[0].name);
     const passwordEncrypted = encryptPassword(password);
-    await pool.query('UPDATE user_accounts SET password_encrypted = $1 WHERE id = $2', [passwordEncrypted, id]);
+    // A reset hands out a new admin-assigned password, same as at creation —
+    // flag it again so the person is prompted to pick their own next login.
+    await pool.query('UPDATE user_accounts SET password_encrypted = $1, must_change_password = true WHERE id = $2', [
+      passwordEncrypted,
+      id,
+    ]);
     res.json({ id: Number(id), name: existing[0].name, password });
   } catch (err) {
     next(err);

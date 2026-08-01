@@ -17,8 +17,8 @@ export function Login({ onSuccess }) {
     setSubmitting(true);
     setError(null);
     try {
-      await api.login(password, name.trim());
-      onSuccess();
+      const result = await api.login(password, name.trim());
+      onSuccess(result.mustChangePassword);
     } catch (err) {
       setError('Incorrect password.');
     } finally {

@@ -445,6 +445,7 @@ function AccountsPanel() {
                   <tr>
                     <th>Name</th>
                     <th>Password</th>
+                    <th>Status</th>
                     <th>Created</th>
                     <th>Last login</th>
                     <th></th>
@@ -460,6 +461,9 @@ function AccountsPanel() {
                           copied={copiedId === account.id}
                           onCopy={() => copyPassword(account)}
                         />
+                      </td>
+                      <td>
+                        <span className="spec">{account.mustChangePassword ? 'Temporary password' : 'Password set by user'}</span>
                       </td>
                       <td className="mono-num">{formatDateTime(account.created_at)}</td>
                       <td className="mono-num">{formatDateTime(account.last_login_at)}</td>

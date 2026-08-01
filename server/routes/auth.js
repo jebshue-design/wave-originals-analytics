@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
-import { passwordMatches } from '../utils/password.js';
+import { passwordMatches, encryptPassword } from '../utils/password.js';
 
 export const authRouter = Router();
 
@@ -37,11 +37,16 @@ authRouter.post('/login', async (req, res, next) => {
 
     req.session.authenticated = true;
     req.session.userName = account ? account.name : userName;
+    // Only a named account (not the shared password) can ever need this —
+    // it's tied to one specific account's own password, which the shared
+    // login has no concept of.
+    req.session.accountId = account ? account.id : null;
+    req.session.mustChangePassword = account ? Boolean(account.must_change_password) : false;
     if (account) {
       await pool.query('UPDATE user_accounts SET last_login_at = now() WHERE id = $1', [account.id]);
     }
     await pool.query('INSERT INTO activity_log (user_name, event_type) VALUES ($1, $2)', [req.session.userName, 'login']);
-    res.json({ ok: true });
+    res.json({ ok: true, mustChangePassword: req.session.mustChangePassword });
   } catch (err) {
     next(err);
   }
@@ -52,7 +57,34 @@ authRouter.post('/logout', (req, res) => {
 });
 
 authRouter.get('/session', (req, res) => {
-  res.json({ authenticated: Boolean(req.session.authenticated), userName: req.session.userName || null });
+  res.json({
+    authenticated: Boolean(req.session.authenticated),
+    userName: req.session.userName || null,
+    mustChangePassword: Boolean(req.session.mustChangePassword),
+  });
+});
+
+// Only reachable for a named account (req.session.accountId), set at login —
+// someone on the shared password has no individual password to change here.
+authRouter.post('/change-password', requireAuth, async (req, res, next) => {
+  try {
+    if (!req.session.accountId) {
+      return res.status(400).json({ error: 'Your login uses the shared team password, so there is nothing to change here.' });
+    }
+    const { newPassword } = req.body || {};
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    const passwordEncrypted = encryptPassword(newPassword);
+    await pool.query('UPDATE user_accounts SET password_encrypted = $1, must_change_password = false WHERE id = $2', [
+      passwordEncrypted,
+      req.session.accountId,
+    ]);
+    req.session.mustChangePassword = false;
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export function requireAuth(req, res, next) {

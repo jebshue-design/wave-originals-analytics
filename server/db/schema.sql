@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   password_encrypted TEXT NOT NULL,
+  must_change_password BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at TIMESTAMPTZ
 );
@@ -140,3 +141,8 @@ CREATE TABLE IF NOT EXISTS user_accounts (
 -- the time of this change.
 ALTER TABLE user_accounts DROP COLUMN IF EXISTS password_hash;
 ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS password_encrypted TEXT;
+
+-- Every account starts with an admin-assigned password (auto-generated at
+-- creation or reset) — this flags that it hasn't been replaced with one the
+-- person chose themselves yet, so the app can prompt for that on first login.
+ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT true;

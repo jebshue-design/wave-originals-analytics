@@ -22,6 +22,8 @@ export const api = {
   login: (password, name) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ password, name }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  changePassword: (newPassword) =>
+    request('/auth/change-password', { method: 'POST', body: JSON.stringify({ newPassword }) }),
   logPageView: (path) => request('/activity/pageview', { method: 'POST', body: JSON.stringify({ path }) }),
   adminLogin: (password) =>
     request('/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
