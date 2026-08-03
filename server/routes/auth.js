@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
-import { passwordMatches, encryptPassword } from '../utils/password.js';
+import { verifyPassword, hashPassword } from '../utils/password.js';
 
 export const authRouter = Router();
 
@@ -29,7 +29,7 @@ authRouter.post('/login', async (req, res, next) => {
     const { rows } = await pool.query('SELECT * FROM user_accounts WHERE lower(name) = lower($1)', [userName]);
     const account = rows[0];
     const ok = account
-      ? passwordMatches(password, account.password_encrypted)
+      ? verifyPassword(password, account.password_hash)
       : passwordsMatch(password, process.env.APP_PASSWORD || '');
     if (!ok) {
       return res.status(401).json({ error: 'Incorrect password' });
@@ -75,9 +75,9 @@ authRouter.post('/change-password', requireAuth, async (req, res, next) => {
     if (typeof newPassword !== 'string' || newPassword.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters.' });
     }
-    const passwordEncrypted = encryptPassword(newPassword);
-    await pool.query('UPDATE user_accounts SET password_encrypted = $1, must_change_password = false WHERE id = $2', [
-      passwordEncrypted,
+    const passwordHash = hashPassword(newPassword);
+    await pool.query('UPDATE user_accounts SET password_hash = $1, must_change_password = false WHERE id = $2', [
+      passwordHash,
       req.session.accountId,
     ]);
     req.session.mustChangePassword = false;

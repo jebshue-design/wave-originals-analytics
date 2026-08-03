@@ -337,23 +337,13 @@ function ActivityPanel() {
   );
 }
 
-function PasswordCell({ password, onCopy, copied }) {
-  return (
-    <div className="admin-password-cell">
-      <span className="admin-password-value">{password}</span>
-      <button type="button" className="icon-button" onClick={onCopy}>
-        {copied ? 'Copied!' : 'Copy'}
-      </button>
-    </div>
-  );
-}
-
 function AccountsPanel() {
   const [accounts, setAccounts] = useState(null);
   const [error, setError] = useState(null);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [copiedId, setCopiedId] = useState(null);
+  const [reveal, setReveal] = useState(null); // { name, password } — shown once, right after create/reset; never stored or fetchable again
+  const [copied, setCopied] = useState(false);
 
   function refresh() {
     api
@@ -370,7 +360,8 @@ function AccountsPanel() {
     setCreating(true);
     setError(null);
     try {
-      await api.createAccount(name.trim());
+      const account = await api.createAccount(name.trim());
+      setReveal({ name: account.name, password: account.password });
       setName('');
       refresh();
     } catch (err) {
@@ -383,7 +374,8 @@ function AccountsPanel() {
   async function handleReset(account) {
     setError(null);
     try {
-      await api.resetAccountPassword(account.id);
+      const result = await api.resetAccountPassword(account.id);
+      setReveal({ name: result.name, password: result.password });
       refresh();
     } catch (err) {
       setError(err.message || 'Could not reset password.');
@@ -401,10 +393,10 @@ function AccountsPanel() {
     }
   }
 
-  function copyPassword(account) {
-    navigator.clipboard?.writeText(account.password).then(() => {
-      setCopiedId(account.id);
-      setTimeout(() => setCopiedId(null), 1500);
+  function copyPassword() {
+    navigator.clipboard?.writeText(reveal.password).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     });
   }
 
@@ -430,6 +422,23 @@ function AccountsPanel() {
         </form>
       </div>
 
+      {reveal && (
+        <div className="glass-panel password-reveal">
+          <div className="password-reveal-info">
+            <span className="spec">Password for {reveal.name} — shown once, copy it now. It can&rsquo;t be looked up again.</span>
+            <span className="password-reveal-value">{reveal.password}</span>
+          </div>
+          <div className="password-reveal-actions">
+            <button className="icon-button" onClick={copyPassword}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+            <button className="icon-button" onClick={() => setReveal(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && <p className="form-error spec">{error}</p>}
       {!error && !accounts && <p className="empty-state spec">Loading…</p>}
 
@@ -444,7 +453,6 @@ function AccountsPanel() {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Password</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Last login</th>
@@ -455,13 +463,6 @@ function AccountsPanel() {
                   {accounts.map((account) => (
                     <tr key={account.id}>
                       <td>{account.name}</td>
-                      <td>
-                        <PasswordCell
-                          password={account.password}
-                          copied={copiedId === account.id}
-                          onCopy={() => copyPassword(account)}
-                        />
-                      </td>
                       <td>
                         <span className="spec">{account.mustChangePassword ? 'Temporary password' : 'Password set by user'}</span>
                       </td>

@@ -124,23 +124,25 @@ ALTER TABLE activity_log ADD CONSTRAINT activity_log_event_type_check CHECK (eve
 -- own password. These sit alongside the shared APP_PASSWORD, not instead of
 -- it: at login, a name matching a row here is checked against its own
 -- password; any other name falls back to the shared password, same as
--- before. password_encrypted is reversibly encrypted (AES-256-GCM, see
--- server/utils/password.js), not one-way hashed, so the admin dashboard can
--- display an account's password back in plain text on request.
+-- before. password_hash is one-way (scrypt, see server/utils/password.js) —
+-- deliberately not recoverable, including by the admin, so a freshly
+-- generated/reset password is shown once in the response and never again.
 CREATE TABLE IF NOT EXISTS user_accounts (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  password_encrypted TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
   must_change_password BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at TIMESTAMPTZ
 );
 
--- Retrofit for databases created before the switch from one-way hashing to
--- reversible encryption (see above) — safe since no accounts existed yet at
--- the time of this change.
-ALTER TABLE user_accounts DROP COLUMN IF EXISTS password_hash;
-ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS password_encrypted TEXT;
+-- Retrofit: switched back from reversible encryption (which let the admin
+-- view a password at any time) to one-way hashing. A one-time script
+-- (server/db/migrate-passwords-once.js, since deleted) carried existing
+-- accounts' actual (decrypted) passwords over to password_hash before this
+-- ran, so nobody's password changed as part of the switch.
+ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE user_accounts DROP COLUMN IF EXISTS password_encrypted;
 
 -- Every account starts with an admin-assigned password (auto-generated at
 -- creation or reset) — this flags that it hasn't been replaced with one the
