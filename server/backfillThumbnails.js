@@ -28,7 +28,7 @@ function isQuotaError(message) {
 // (e.g. the daily cron route).
 export async function runThumbnailBackfill({ batchSize = DEFAULT_BATCH_SIZE } = {}) {
   const { rows } = await pool.query(
-    `SELECT episode_id, episode_title, show_name
+    `SELECT episode_id, episode_title, show_name, published_at
      FROM episodes
      WHERE youtube_video_id IS NULL
        AND youtube_views_total IS NOT NULL
@@ -44,7 +44,7 @@ export async function runThumbnailBackfill({ batchSize = DEFAULT_BATCH_SIZE } = 
   for (const row of rows) {
     const channelId = SHOW_CHANNEL_IDS[row.show_name];
     try {
-      const videoId = await findYoutubeVideoId(row.episode_title, channelId);
+      const videoId = await findYoutubeVideoId(row.episode_title, channelId, row.published_at);
       await pool.query(
         `UPDATE episodes SET youtube_video_id = $1, youtube_lookup_attempted_at = now() WHERE episode_id = $2`,
         [videoId, row.episode_id]
